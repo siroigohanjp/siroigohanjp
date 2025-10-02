@@ -1,163 +1,276 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ローグライク（広めマップ）</title>
-<style>
-body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin:0; padding:10px;}
-#status{margin-bottom:10px;padding:5px;border:1px solid #333;background:#eee;width:90vw;max-width:500px;font-size:14px;white-space:pre-wrap;}
-#game{display:grid;grid-template-columns:repeat(10,1fr);width:90vw;max-width:500px;background:#333;}
-.cell{display:flex;align-items:center;justify-content:center;font-size:20px;aspect-ratio:1/1;}
-.wall{background:#555;color:#555;}
-#log{margin-top:10px;width:90vw;max-width:500px;height:140px;overflow-y:auto;border:1px solid #333;padding:5px;font-size:14px;background:#eee;white-space:pre-wrap;}
-#controls{margin-top:15px;display:grid;grid-template-columns:repeat(3,70px);grid-template-rows:repeat(3,70px);gap:5px;justify-content:center;}
-#controls button,#battle button,#itemButton{font-size:18px;border-radius:10px;padding:5px;}
-#controls .empty{background:transparent;border:none;}
-#battle{margin-top:15px;display:none;grid-template-columns:repeat(2,120px);gap:5px;justify-content:center;}
-#itemButton{margin-top:10px;}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>スマログ</title>
+  <style>
+    :root{--cell:44px}
+    body{font-family: system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;margin:0;background:#0f172a;color:#e6eef8}
+    header{padding:12px 16px;background:#0b1220;box-shadow:0 2px 8px rgba(0,0,0,.6);display:flex;align-items:center;gap:12px}
+    h1{margin:0;font-size:18px}
+    #game{display:flex;gap:12px;padding:12px}
+    #leftCol{position:relative}
+    #status{position:absolute;left:-220px;top:0;width:200px;background:#071029;border:1px solid rgba(255,255,255,.04);padding:10px;border-radius:8px}
+    #status h3{margin:0 0 8px 0;font-size:14px}
+    #log{position:absolute;right:-260px;top:0;width:240px;height:260px;background:#071029;border:1px solid rgba(255,255,255,.04);padding:10px;border-radius:8px;overflow:auto}
+    #grid{display:grid;grid-template-columns:repeat(10,var(--cell));grid-template-rows:repeat(10,var(--cell));gap:2px;background:#081426;padding:8px;border-radius:8px}
+    .cell{width:var(--cell);height:var(--cell);display:flex;align-items:center;justify-content:center;font-size:12px;border-radius:6px}
+    .floor{background:linear-gradient(180deg,#0b1630,#071428)}
+    .wall{background:linear-gradient(180deg,#4b5563,#111827);box-shadow:inset 0 -6px 10px rgba(0,0,0,.6)}
+    .player{background:linear-gradient(180deg,#154c8a,#0b3a6b);color:#fff}
+    .monster{background:linear-gradient(180deg,#7b1f1f,#4b0f0f);color:#fff}
+    .empty{background:transparent}
+    #controls{display:flex;flex-direction:column;gap:6px;align-items:center;margin-top:12px}
+    .row{display:flex;gap:6px}
+    button{background:#0b1220;border:1px solid rgba(255,255,255,.05);color:#dfeeff;padding:8px 10px;border-radius:6px;cursor:pointer}
+    button.big{padding:12px 16px}
+    #footer{padding:12px;text-align:center;color:#98a0b3}
+    /* battle panel */
+    #battle{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:#041028;padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,.04);display:none;z-index:40;width:320px}
+    #battle h3{margin:0 0 8px 0}
+  </style>
 </head>
 <body>
+  <header>
+    <h1>スマログ — ミニ ローグライク</h1>
+    <div style="margin-left:auto;font-size:13px;color:#9fb2d6">操作: 画面の矢印ボタンで移動</div>
+  </header>
 
-<div id="status"></div>
-<div id="game"></div>
-<div id="log"></div>
+  <div id="game">
+    <div id="leftCol">
+      <div id="status">
+        <h3>ステータス</h3>
+        <div id="statusContent">
+          <!-- JS fills -->
+        </div>
+        <div style="margin-top:8px"><button id="restart">再生成 (地図/モンスター)</button></div>
+      </div>
 
-<div id="controls">
-  <div></div><button onclick="move(0,-1)">↑</button><div></div>
-  <button onclick="move(-1,0)">←</button><div class="empty"></div><button onclick="move(1,0)">→</button>
-  <div></div><button onclick="move(0,1)">↓</button><div></div>
-</div>
-<button id="itemButton" onclick="useItem()">薬草を使う</button>
+      <div id="log" aria-live="polite">
+        <strong>ログ</strong>
+        <div id="logContent" style="margin-top:8px;font-size:13px"></div>
+      </div>
 
-<div id="battle">
-  <button onclick="battleAction('attack')">こうげき</button>
-  <button onclick="battleAction('defend')">ぼうぎょ</button>
-  <button onclick="battleAction('item')">アイテム</button>
-  <button onclick="battleAction('escape')">にげる</button>
-</div>
+      <div id="grid" aria-label="マップ"></div>
+
+      <div id="controls">
+        <div class="row"><button data-dir="up" class="big">↑</button></div>
+        <div class="row"><button data-dir="left">←</button><button data-dir="down">↓</button><button data-dir="right">→</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="battle">
+    <h3>戦闘</h3>
+    <div id="battleInfo"></div>
+    <div style="margin-top:8px">
+      <button id="attackBtn">たたかう</button>
+      <button id="fleeBtn">にげる</button>
+    </div>
+  </div>
+
+  <div id="footer">マップ: 10×10 / 自動生成 / モンスター自動配置</div>
 
 <script>
-const size=10;
-let player={x:0,y:0,hp:20,atk:5,def:2,spd:5,exp:0,bag:[],bagSize:5};
-let floor=1;
-let map=[],currentEnemy=null,enemyPos=null,inBattle=false;
-let logEl=document.getElementById('log'),gameEl=document.getElementById('game');
-let controlsEl=document.getElementById('controls'),battleEl=document.getElementById('battle');
-let statusEl=document.getElementById('status');
+(() => {
+  const SIZE = 10;
+  const NUM_MONSTERS = 8;
+  const WALL_RATE = 0.18; // 壁の割合（約）
 
-function log(msg){logEl.innerText+=msg+'\n';logEl.scrollTop=logEl.scrollHeight;}
-function updateStatus(){statusEl.innerText=`階層:${floor}\nHP:${player.hp} ATK:${player.atk} DEF:${player.def} SPD:${player.spd} EXP:${player.exp}\nバッグ:${player.bag.length}/${player.bagSize}`;}
+  let map = [];
+  let player = {x:0,y:0,hp:20,maxHp:20,atk:5};
+  let monsters = {}; // key: y*SIZE+x -> {hp,atk}
+  let inBattle = false;
+  let currentEnemyKey = null;
 
-function createEnemy(){
-  const types=[
-    {name:"スライム",hp:[8,15],atk:[2,4],def:[0,1],spd:[1,3],exp:[3,6]},
-    {name:"ゴブリン",hp:[10,18],atk:[3,6],def:[1,2],spd:[2,4],exp:[5,8]},
-    {name:"オオカミ",hp:[9,14],atk:[3,5],def:[1,2],spd:[4,7],exp:[6,9]},
-    {name:"バット",hp:[6,12],atk:[2,4],def:[0,1],spd:[5,8],exp:[5,7]},
-    {name:"スケルトン",hp:[12,18],atk:[3,5],def:[2,4],spd:[2,3],exp:[7,10]},
-    {name:"マジシャン",hp:[8,12],atk:[5,8],def:[1,2],spd:[3,5],exp:[8,12]},
-    {name:"トロル",hp:[18,25],atk:[6,9],def:[2,3],spd:[1,2],exp:[10,14]},
-    {name:"バンパイア",hp:[14,20],atk:[5,7],def:[2,3],spd:[3,5],exp:[12,16]},
-    {name:"ゴーレム",hp:[20,30],atk:[4,6],def:[5,8],spd:[1,2],exp:[15,20]},
-    {name:"ドラゴン",hp:[30,40],atk:[8,12],def:[4,6],spd:[4,6],exp:[30,40]}
-  ];
-  let weights=types.map((e,i)=>Math.max(1,floor-i+2));
-  let total=weights.reduce((a,b)=>a+b,0);
-  let r=Math.random()*total; let idx=0;
-  for(let i=0;i<weights.length;i++){if(r<weights[i]){idx=i;break;} r-=weights[i];}
-  let t=types[idx]; function rand(r){return Math.floor(Math.random()*(r[1]-r[0]+1))+r[0];}
-  return {name:t.name,hp:rand(t.hp),atk:rand(t.atk),def:rand(t.def),spd:rand(t.spd),exp:rand(t.exp)};
-}
+  const gridEl = document.getElementById('grid');
+  const statusContent = document.getElementById('statusContent');
+  const logContent = document.getElementById('logContent');
+  const battleEl = document.getElementById('battle');
+  const battleInfo = document.getElementById('battleInfo');
+  const attackBtn = document.getElementById('attackBtn');
+  const fleeBtn = document.getElementById('fleeBtn');
+  const restartBtn = document.getElementById('restart');
 
-function generateMap(){
-  map=[]; 
-  for(let y=0;y<size;y++){map[y]=[];for(let x=0;x<size;x++){map[y][x]='#';}}
-
-  // プレイヤー位置
-  player.x=Math.floor(size/2); 
-  player.y=Math.floor(size/2);
-  map[player.y][player.x]='.';
-
-  // 階段位置
-  let stairsX, stairsY;
-  do{
-    stairsX=Math.floor(Math.random()*size);
-    stairsY=Math.floor(Math.random()*size);
-  }while(stairsX===player.x && stairsY===player.y);
-
-  // 必達経路
-  let cx = player.x, cy = player.y;
-  while(cx !== stairsX || cy !== stairsY){
-    if(cx < stairsX) cx++; else if(cx > stairsX) cx--;
-    else if(cy < stairsY) cy++; else if(cy > stairsY) cy--;
-    map[cy][cx]='.';
+  function log(msg){
+    const d = document.createElement('div');
+    d.textContent = msg;
+    logContent.prepend(d);
   }
-  map[stairsY][stairsX]='>';
 
-  // 広めランダムウォークで通路拡張
-  for(let i=0;i<10;i++){ // 10本ウォーク
-    let x = Math.floor(Math.random()*size);
-    let y = Math.floor(Math.random()*size);
-    for(let j=0;j<15;j++){ // 各ウォーク15歩
-      map[y][x]='.';
-      let dir=Math.floor(Math.random()*4);
-      if(dir===0 && y>0) y--;
-      else if(dir===1 && y<size-1) y++;
-      else if(dir===2 && x>0) x--;
-      else if(dir===3 && x<size-1) x++;
+  function idx(x,y){return y*SIZE + x}
+
+  function generateMap(){
+    // generate until reachable area is decent
+    while(true){
+      map = Array.from({length:SIZE},()=>Array.from({length:SIZE},()=>0));
+      // place walls randomly
+      for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+        if(Math.random() < WALL_RATE) map[y][x] = 1; // wall
+      }
+      // ensure player start is empty
+      player.x = 0; player.y = 0;
+      map[0][0] = 0;
+      // ensure some open area: flood fill from player and check reachable cells
+      const q=[{x:player.x,y:player.y}];
+      const vis = Array.from({length:SIZE},()=>Array(SIZE).fill(false));
+      vis[player.y][player.x]=true;
+      let cnt=1;
+      while(q.length){
+        const {x,y} = q.shift();
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
+          const nx=x+dx, ny=y+dy;
+          if(nx>=0&&ny>=0&&nx<SIZE&&ny<SIZE && !vis[ny][nx] && map[ny][nx]===0){
+            vis[ny][nx]=true; q.push({x:nx,y:ny}); cnt++;
+          }
+        });
+      }
+      if(cnt >= Math.max(20, SIZE*SIZE*0.35)) break; // ensure enough free tiles
     }
-  }
 
-  // 敵・薬草配置
-  for(let y=0;y<size;y++){
-    for(let x=0;x<size;x++){
-      if(map[y][x]==='.' && Math.random()<0.08) map[y][x]='M';
-      else if(map[y][x]==='.' && Math.random()<0.04) map[y][x]='+';
+    // place monsters
+    monsters = {};
+    let placed=0;
+    const freeCells = [];
+    for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++)if(map[y][x]===0 && !(x===player.x&&y===player.y)) freeCells.push({x,y});
+    shuffleArray(freeCells);
+    for(let i=0;i<Math.min(NUM_MONSTERS, freeCells.length); i++){
+      const {x,y} = freeCells[i];
+      const key = idx(x,y);
+      monsters[key] = {hp:6 + Math.floor(Math.random()*6), atk:2 + Math.floor(Math.random()*3)};
+      placed++;
     }
+
+    render();
+    log('新しいマップを生成しました。モンスター: ' + placed + '体');
   }
 
-  map[player.y][player.x]='@'; // プレイヤー
-}
+  function shuffleArray(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}}
 
-function drawMap(){
-  gameEl.innerHTML='';
-  for(let y=0;y<size;y++){
-    for(let x=0;x<size;x++){
-      let cell=document.createElement('div');cell.className='cell';
-      if(map[y][x]==='#') cell.className+=' wall';
-      cell.textContent=map[y][x];
-      gameEl.appendChild(cell);
+  function render(){
+    gridEl.innerHTML='';
+    for(let y=0;y<SIZE;y++){
+      for(let x=0;x<SIZE;x++){
+        const cell = document.createElement('div');
+        cell.className = 'cell ' + (map[y][x]===1 ? 'wall' : 'floor');
+        cell.dataset.x = x; cell.dataset.y = y;
+        const k = idx(x,y);
+        if(player.x === x && player.y === y){ cell.className = 'cell player'; cell.textContent = '⚑'; }
+        else if(monsters[k]){ cell.className = 'cell monster'; cell.textContent = '👾'; }
+        else if(map[y][x]===1){ cell.className = 'cell wall'; }
+        else { cell.className = 'cell floor'; }
+        gridEl.appendChild(cell);
+      }
     }
+    updateStatus();
   }
-  updateStatus();
-}
 
-function move(dx,dy){
-  if(inBattle) return;
-  let nx=player.x+dx,ny=player.y+dy;
-  if(nx<0||ny<0||nx>=size||ny>=size) return;
-  let cell=map[ny][nx];
+  function updateStatus(){
+    statusContent.innerHTML = '';
+    const s = document.createElement('div');
+    s.innerHTML = `HP: ${player.hp}/${player.maxHp}<br>ATK: ${player.atk}<br>位置: (${player.x},${player.y})`;
+    statusContent.appendChild(s);
+  }
 
-  if(cell==='#') return; // 壁通行不可
-  if(cell==='>'){floor++; log(`階段を降りて階層${floor}へ！`); generateMap(); drawMap(); return;}
-  if(cell==='M'){currentEnemy=createEnemy(); enemyPos={x:nx,y:ny}; inBattle=true; controlsEl.style.display='none'; document.getElementById("itemButton").style.display='none'; battleEl.style.display='grid';
-    log(`敵「${currentEnemy.name}」が現れた！`); 
-    log(`【敵ステータス】 HP:${currentEnemy.hp} ATK:${currentEnemy.atk} DEF:${currentEnemy.def} SPD:${currentEnemy.spd} EXP:${currentEnemy.exp}`);
-    return;}
-  if(cell==='+'){if(player.bag.length<player.bagSize){player.bag.push("薬草");log("薬草を拾った！（バッグ"+player.bag.length+"/"+player.bagSize+"）");} else{log("バッグがいっぱいで薬草を拾えない！");}}
+  function tryMove(dx,dy){
+    if(inBattle) return;
+    const nx = player.x + dx;
+    const ny = player.y + dy;
+    if(nx<0||ny<0||nx>=SIZE||ny>=SIZE) { log('そこには移動できません。'); return; }
+    if(map[ny][nx]===1){ log('壁だ！行けない。'); return; }
+    const key = idx(nx,ny);
+    if(monsters[key]){
+      // enter battle selection
+      openBattle(key);
+      return;
+    }
+    player.x = nx; player.y = ny;
+    log(`移動: (${player.x},${player.y})`);
+    render();
+  }
 
-  map[player.y][player.x]='.';
-  player.x=nx; player.y=ny;
-  map[player.y][player.x]='@';
-  drawMap();
-}
+  function openBattle(key){
+    inBattle = true; currentEnemyKey = key;
+    const enemy = monsters[key];
+    battleEl.style.display = 'block';
+    battleInfo.innerHTML = `敵 HP: ${enemy.hp} / 攻撃: ${enemy.atk}`;
+    log('モンスターと遭遇！ 戦うか逃げるか選択してください。');
+  }
 
-function useItem(){let idx=player.bag.indexOf("薬草");if(idx>=0){player.hp+=5;player.bag.splice(idx,1);log("薬草でHP+5！（HP:"+player.hp+"）");} else{log("薬草がない！");} updateStatus();}
+  function closeBattle(){ inBattle=false; currentEnemyKey=null; battleEl.style.display='none'; }
 
-generateMap(); drawMap();
+  attackBtn.addEventListener('click', ()=>{
+    if(!inBattle) return;
+    const enemy = monsters[currentEnemyKey];
+    if(!enemy) { closeBattle(); render(); return; }
+    // player attacks
+    enemy.hp -= player.atk;
+    log(`あなたの攻撃！ 敵に ${player.atk} ダメージ`);
+    if(enemy.hp <= 0){
+      log('敵を倒した！');
+      delete monsters[currentEnemyKey];
+      closeBattle();
+      render();
+      return;
+    }
+    // enemy counterattacks
+    player.hp -= enemy.atk;
+    log(`敵の反撃！ あなたは ${enemy.atk} ダメージ`);
+    if(player.hp <= 0){
+      player.hp = 0; updateStatus(); render();
+      log('あなたは倒れた... ゲームオーバー');
+      setTimeout(()=>{ if(confirm('ゲームオーバー。再挑戦しますか？')){ player.hp = player.maxHp; generateMap(); } },100);
+      closeBattle();
+      return;
+    }
+    battleInfo.innerHTML = `敵 HP: ${enemy.hp} / 攻撃: ${enemy.atk}<br><br>あなた HP: ${player.hp}/${player.maxHp}`;
+    updateStatus();
+  });
+
+  fleeBtn.addEventListener('click', ()=>{
+    if(!inBattle) return;
+    // attempt flee: 60% success
+    if(Math.random() < 0.6){
+      log('にげることに成功した！');
+      closeBattle();
+      // do not move into monster tile
+    } else {
+      log('にげあしが止まった！ 敵の攻撃を受けた');
+      const enemy = monsters[currentEnemyKey];
+      player.hp -= enemy.atk;
+      updateStatus();
+      if(player.hp <= 0){ player.hp = 0; render(); log('あなたは倒れた... ゲームオーバー'); setTimeout(()=>{ if(confirm('ゲームオーバー。再挑戦しますか？')){ player.hp = player.maxHp; generateMap(); } },100); closeBattle(); return; }
+    }
+  });
+
+  // controls
+  document.querySelectorAll('button[data-dir]').forEach(btn=>btn.addEventListener('click', ()=>{
+    const d = btn.dataset.dir;
+    if(d==='up') tryMove(0,-1);
+    if(d==='down') tryMove(0,1);
+    if(d==='left') tryMove(-1,0);
+    if(d==='right') tryMove(1,0);
+  }));
+
+  // optional keyboard support
+  window.addEventListener('keydown', (e)=>{
+    if(e.key.includes('Arrow')){
+      e.preventDefault();
+      if(e.key==='ArrowUp') tryMove(0,-1);
+      if(e.key==='ArrowDown') tryMove(0,1);
+      if(e.key==='ArrowLeft') tryMove(-1,0);
+      if(e.key==='ArrowRight') tryMove(1,0);
+    }
+    if(e.key === 'r') { player.hp = player.maxHp; generateMap(); }
+  });
+
+  restartBtn.addEventListener('click', ()=>{ player.hp = player.maxHp; generateMap(); });
+
+  // init
+  generateMap();
+
+})();
 </script>
-
 </body>
 </html>
