@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>スマログ</title>
   <style>
-    :root{--cell:22px} /* ← 44pxから半分に縮小 */
+    :root{--cell:22px}
     body{font-family: system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;margin:0;background:#0f172a;color:#e6eef8}
     header{padding:12px 16px;background:#0b1220;box-shadow:0 2px 8px rgba(0,0,0,.6);display:flex;align-items:center;gap:12px}
     h1{margin:0;font-size:18px}
@@ -15,7 +15,7 @@
     #status h3{margin:0 0 8px 0;font-size:14px}
     #log{position:absolute;right:-260px;top:0;width:240px;height:260px;background:#071029;border:1px solid rgba(255,255,255,.04);padding:10px;border-radius:8px;overflow:auto}
     #grid{display:grid;grid-template-columns:repeat(10,var(--cell));grid-template-rows:repeat(10,var(--cell));gap:2px;background:#081426;padding:8px;border-radius:8px}
-    .cell{width:var(--cell);height:var(--cell);display:flex;align-items:center;justify-content:center;font-size:10px;border-radius:4px}
+    .cell{width:var(--cell);height:var(--cell);display:flex;align-items:center;justify-content:center;font-size:12px;border-radius:6px}
     .floor{background:linear-gradient(180deg,#0b1630,#071428)}
     .wall{background:linear-gradient(180deg,#4b5563,#111827);box-shadow:inset 0 -6px 10px rgba(0,0,0,.6)}
     .player{background:linear-gradient(180deg,#154c8a,#0b3a6b);color:#fff}
@@ -33,8 +33,8 @@
 </head>
 <body>
   <header>
-    <h1>スマログｖ0.0.1</h1>
-    <div style="margin-left:auto;font-size:13px;color:#9fb2d6">操作: 画面の矢印ボタンで移動</div>
+    <h1>スマログ — v0.0.1</h1>
+    <div style="margin-left:auto;font-size:13px;color:#9fb2d6"> </div>
   </header>
 
   <div id="game">
@@ -70,10 +70,207 @@
     </div>
   </div>
 
-  <div id="footer">マップ: 10×10 / 自動生成 / モンスター自動配置</div>
+  <div id="footer">SiroiGohan</div>
 
 <script>
-// (JS 部分はそのまま)
+(() => {
+  const SIZE = 10;
+  const NUM_MONSTERS = 8;
+  const WALL_RATE = 0.18; // 壁の割合（約）
+
+  let map = [];
+  let player = {x:0,y:0,hp:20,maxHp:20,atk:5};
+  let monsters = {}; // key: y*SIZE+x -> {hp,atk}
+  let inBattle = false;
+  let currentEnemyKey = null;
+
+  const gridEl = document.getElementById('grid');
+  const statusContent = document.getElementById('statusContent');
+  const logContent = document.getElementById('logContent');
+  const battleEl = document.getElementById('battle');
+  const battleInfo = document.getElementById('battleInfo');
+  const attackBtn = document.getElementById('attackBtn');
+  const fleeBtn = document.getElementById('fleeBtn');
+  const restartBtn = document.getElementById('restart');
+
+  function log(msg){
+    const d = document.createElement('div');
+    d.textContent = msg;
+    logContent.prepend(d);
+  }
+
+  function idx(x,y){return y*SIZE + x}
+
+  function generateMap(){
+    // generate until reachable area is decent
+    while(true){
+      map = Array.from({length:SIZE},()=>Array.from({length:SIZE},()=>0));
+      // place walls randomly
+      for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+        if(Math.random() < WALL_RATE) map[y][x] = 1; // wall
+      }
+      // ensure player start is empty
+      player.x = 0; player.y = 0;
+      map[0][0] = 0;
+      // ensure some open area: flood fill from player and check reachable cells
+      const q=[{x:player.x,y:player.y}];
+      const vis = Array.from({length:SIZE},()=>Array(SIZE).fill(false));
+      vis[player.y][player.x]=true;
+      let cnt=1;
+      while(q.length){
+        const {x,y} = q.shift();
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
+          const nx=x+dx, ny=y+dy;
+          if(nx>=0&&ny>=0&&nx<SIZE&&ny<SIZE && !vis[ny][nx] && map[ny][nx]===0){
+            vis[ny][nx]=true; q.push({x:nx,y:ny}); cnt++;
+          }
+        });
+      }
+      if(cnt >= Math.max(20, SIZE*SIZE*0.35)) break; // ensure enough free tiles
+    }
+
+    // place monsters
+    monsters = {};
+    let placed=0;
+    const freeCells = [];
+    for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++)if(map[y][x]===0 && !(x===player.x&&y===player.y)) freeCells.push({x,y});
+    shuffleArray(freeCells);
+    for(let i=0;i<Math.min(NUM_MONSTERS, freeCells.length); i++){
+      const {x,y} = freeCells[i];
+      const key = idx(x,y);
+      monsters[key] = {hp:6 + Math.floor(Math.random()*6), atk:2 + Math.floor(Math.random()*3)};
+      placed++;
+    }
+
+    render();
+    log('新しいマップを生成しました。モンスター: ' + placed + '体');
+  }
+
+  function shuffleArray(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}}
+
+  function render(){
+    gridEl.innerHTML='';
+    for(let y=0;y<SIZE;y++){
+      for(let x=0;x<SIZE;x++){
+        const cell = document.createElement('div');
+        cell.className = 'cell ' + (map[y][x]===1 ? 'wall' : 'floor');
+        cell.dataset.x = x; cell.dataset.y = y;
+        const k = idx(x,y);
+        if(player.x === x && player.y === y){ cell.className = 'cell player'; cell.textContent = '⚑'; }
+        else if(monsters[k]){ cell.className = 'cell monster'; cell.textContent = '👾'; }
+        else if(map[y][x]===1){ cell.className = 'cell wall'; }
+        else { cell.className = 'cell floor'; }
+        gridEl.appendChild(cell);
+      }
+    }
+    updateStatus();
+  }
+
+  function updateStatus(){
+    statusContent.innerHTML = '';
+    const s = document.createElement('div');
+    s.innerHTML = `HP: ${player.hp}/${player.maxHp}<br>ATK: ${player.atk}<br>位置: (${player.x},${player.y})`;
+    statusContent.appendChild(s);
+  }
+
+  function tryMove(dx,dy){
+    if(inBattle) return;
+    const nx = player.x + dx;
+    const ny = player.y + dy;
+    if(nx<0||ny<0||nx>=SIZE||ny>=SIZE) { log('そこには移動できません。'); return; }
+    if(map[ny][nx]===1){ log('壁だ！行けない。'); return; }
+    const key = idx(nx,ny);
+    if(monsters[key]){
+      // enter battle selection
+      openBattle(key);
+      return;
+    }
+    player.x = nx; player.y = ny;
+    log(`移動: (${player.x},${player.y})`);
+    render();
+  }
+
+  function openBattle(key){
+    inBattle = true; currentEnemyKey = key;
+    const enemy = monsters[key];
+    battleEl.style.display = 'block';
+    battleInfo.innerHTML = `敵 HP: ${enemy.hp} / 攻撃: ${enemy.atk}`;
+    log('モンスターと遭遇！ 戦うか逃げるか選択してください。');
+  }
+
+  function closeBattle(){ inBattle=false; currentEnemyKey=null; battleEl.style.display='none'; }
+
+  attackBtn.addEventListener('click', ()=>{
+    if(!inBattle) return;
+    const enemy = monsters[currentEnemyKey];
+    if(!enemy) { closeBattle(); render(); return; }
+    // player attacks
+    enemy.hp -= player.atk;
+    log(`あなたの攻撃！ 敵に ${player.atk} ダメージ`);
+    if(enemy.hp <= 0){
+      log('敵を倒した！');
+      delete monsters[currentEnemyKey];
+      closeBattle();
+      render();
+      return;
+    }
+    // enemy counterattacks
+    player.hp -= enemy.atk;
+    log(`敵の反撃！ あなたは ${enemy.atk} ダメージ`);
+    if(player.hp <= 0){
+      player.hp = 0; updateStatus(); render();
+      log('あなたは倒れた... ゲームオーバー');
+      setTimeout(()=>{ if(confirm('ゲームオーバー。再挑戦しますか？')){ player.hp = player.maxHp; generateMap(); } },100);
+      closeBattle();
+      return;
+    }
+    battleInfo.innerHTML = `敵 HP: ${enemy.hp} / 攻撃: ${enemy.atk}<br><br>あなた HP: ${player.hp}/${player.maxHp}`;
+    updateStatus();
+  });
+
+  fleeBtn.addEventListener('click', ()=>{
+    if(!inBattle) return;
+    // attempt flee: 60% success
+    if(Math.random() < 0.6){
+      log('にげることに成功した！');
+      closeBattle();
+      // do not move into monster tile
+    } else {
+      log('にげあしが止まった！ 敵の攻撃を受けた');
+      const enemy = monsters[currentEnemyKey];
+      player.hp -= enemy.atk;
+      updateStatus();
+      if(player.hp <= 0){ player.hp = 0; render(); log('あなたは倒れた... ゲームオーバー'); setTimeout(()=>{ if(confirm('ゲームオーバー。再挑戦しますか？')){ player.hp = player.maxHp; generateMap(); } },100); closeBattle(); return; }
+    }
+  });
+
+  // controls
+  document.querySelectorAll('button[data-dir]').forEach(btn=>btn.addEventListener('click', ()=>{
+    const d = btn.dataset.dir;
+    if(d==='up') tryMove(0,-1);
+    if(d==='down') tryMove(0,1);
+    if(d==='left') tryMove(-1,0);
+    if(d==='right') tryMove(1,0);
+  }));
+
+  // optional keyboard support
+  window.addEventListener('keydown', (e)=>{
+    if(e.key.includes('Arrow')){
+      e.preventDefault();
+      if(e.key==='ArrowUp') tryMove(0,-1);
+      if(e.key==='ArrowDown') tryMove(0,1);
+      if(e.key==='ArrowLeft') tryMove(-1,0);
+      if(e.key==='ArrowRight') tryMove(1,0);
+    }
+    if(e.key === 'r') { player.hp = player.maxHp; generateMap(); }
+  });
+
+  restartBtn.addEventListener('click', ()=>{ player.hp = player.maxHp; generateMap(); });
+
+  // init
+  generateMap();
+
+})();
 </script>
 </body>
 </html>
