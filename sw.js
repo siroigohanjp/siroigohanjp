@@ -1,6 +1,6 @@
 var CACHE_NAME = 'pwa-sample-caches';
 var urlsToCache = [
-	'/pwa/',
+	'/siroigohanjp/',
 ];
 
 // インストール処理
