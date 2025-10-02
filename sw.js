@@ -1,6 +1,6 @@
 var CACHE_NAME = 'pwa-sample-caches';
 var urlsToCache = [
-	'/siroigohanjp/',
+	'/siroigohanjp.github.io/',
 ];
 
 // インストール処理
