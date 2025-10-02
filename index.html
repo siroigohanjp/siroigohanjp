@@ -12,6 +12,7 @@
       background:#0f172a;
       color:#e6eef8
     }
+    
     header{
       padding:12px 16px;
       background:#0b1220;
@@ -20,17 +21,19 @@
       align-items:center;
       gap:12px
     }
+    
     h1{margin:0;font-size:18px}
     #game{display:flex;gap:12px;padding:12px}
     #leftCol{position:relative}
     #status{
       position:absolute;
-      left:-180px;top:0;
+      left:-220px;top:0;
       width:200px;
       background:#071029;
       border:1px solid rgba(255,255,255,.04);
       padding:10px;border-radius:8px
     }
+    
     #status h3{margin:0 0 8px 0;font-size:14px}
     #grid{
       display:grid;
@@ -41,6 +44,7 @@
       padding:8px;
       border-radius:8px
     }
+    
     .cell{width:var(--cell);height:var(--cell);display:flex;align-items:center;justify-content:center;font-size:10px;border-radius:4px}
     .floor{background:linear-gradient(180deg,#0b1630,#071428)}
     .wall{background:linear-gradient(180deg,#4b5563,#111827);box-shadow:inset 0 -6px 10px rgba(0,0,0,.6)}
@@ -57,6 +61,7 @@
       border-radius:6px;
       cursor:pointer
     }
+    
     button.big{padding:12px 16px}
     #footer{padding:12px;text-align:center;color:#98a0b3}
     /* battle panel */
@@ -71,6 +76,7 @@
       display:none;z-index:40;
       width:320px
     }
+    
     #battle h3{margin:0 0 8px 0}
     /* log 下に移動 */
     #log{
@@ -83,12 +89,13 @@
       border-radius:8px;
       overflow:auto
     }
+    
   </style>
 </head>
 <body>
   <header>
-    <h1>スマログ — smart roguelite</h1>
-    <div style="margin-left:auto;font-size:13px;color:#9fb2d6">V0.0.2</div>
+    <h1>スマログ — s r</h1>
+    <div style="margin-left:auto;font-size:13px;color:#9fb2d6">V0.0.3</div>
   </header>
 
   <div id="game">
@@ -154,8 +161,10 @@ function generateMap(){
       if(Math.random()<0.2) row.push("wall");
       else row.push("floor");
     }
+    
     map.push(row);
   }
+  
   // プレイヤー初期位置確保
   player.x=0;player.y=0;
   map[player.y][player.x]="floor";
@@ -169,6 +178,7 @@ function generateMap(){
     }while((mx==0&&my==0)||map[my][mx]==="wall");
     monsters.push({x:mx,y:my,hp:10,atk:3});
   }
+  
   render();
   updateStatus();
   log("新しいマップが生成された！");
@@ -224,6 +234,7 @@ document.getElementById("attackBtn").onclick=()=>{
     render();
     return;
   }
+  
   player.hp-=currentEnemy.atk;
   log(`敵の反撃！ プレイヤーは${currentEnemy.atk}ダメージを受けた`);
   if(player.hp<=0){ log("ゲームオーバー…"); }
