@@ -1,10 +1,13 @@
-<div id="titleScreen" style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;">
-    <h1>ミニローグ</h1>
+<div id="titleScreen" style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:10">
+    <h1>ミニローグライク v0.0.1</h1>
     <button id="startBtn">はじめる</button>
     <button id="resetBtn">初期化</button>
     <button id="supportBtn">サポートセンター</button>
 </div>
+
 <div id="gameUI" style="display:none;">
+
+
 
 
 <!doctype html>
@@ -52,12 +55,8 @@ button{background:#2a2a2a;color:#fff;border:1px solid #444;padding:6px 8px;borde
 </style>
 </head>
 <body>
-<div class="topbar">
-<h2>ミニローグライク v0.0.1</h2>
-</div>
 
-
-<div class="container">
+    <div class="container">
   <div id="game">
     <div id="map"></div>
 
@@ -1019,6 +1018,22 @@ function startGameUI(){
 }
 </script>
 
-
 </div>
 
+<script>
+function startGameUI(){
+    document.getElementById('titleScreen').style.display = 'none';
+    document.getElementById('gameUI').style.display = 'flex'; // display:blockでもOK
+    renderAll();
+}
+
+document.getElementById('returnTitleBtn').onclick = () => {
+    if(confirm('タイトル画面に戻ります。よろしいですか？')){
+        document.getElementById('gameUI').style.display = 'none';
+        document.getElementById('titleScreen').style.display = 'flex';
+        // レイアウト崩れ防止のため、ゲームUIはリロードや再構築せず表示切替だけ
+        renderAll(); 
+        log('タイトル画面に戻りました');
+    }
+};
+</script>
