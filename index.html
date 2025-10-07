@@ -2,423 +2,331 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>SFドローンシミュレーション</title>
+<title>タクティクス</title>
 <style>
 body {
-    background-color: #000;
+    background-color: #1a1a1a;
     color: #fff;
-    margin: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
     font-family: monospace;
-    overflow: hidden;
-    position: relative;
+    display: flex;
+    margin: 0;
+    padding: 10px;
+    gap: 20px;
 }
-canvas { border: 1px solid #fff; }
-#top-menu, #overlay, #level-up-overlay, #upgrade-shop, #reset-confirmation {
-    position: absolute; top: 0; left: 0;
-    width: 100%; height: 100%;
-    display: none; flex-direction: column;
-    justify-content: center; align-items: center;
-    background-color: rgba(0,0,0,0.85);
-    text-align: center; z-index: 20;
+#titleScreen, #gameScreen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
 }
-#top-menu { display: flex; font-size: 2em; }
-#top-menu button {
-    margin: 10px; padding: 20px 40px;
-    font-size: 1em; cursor: pointer;
-    background-color: #00f; color: #fff;
-    border: none; border-radius: 5px;
+#titleScreen.active, #gameScreen.active { display: flex; }
+#gameContainer {
+    display: flex;
+    gap: 20px;
 }
-#info-area {
-    position: fixed; top: 10px; left: 10px;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 10px 14px; border-radius: 8px;
-    font-size: 14px; color: #fff; z-index: 1000;
+#map {
+    display: grid;
+    grid-template-columns: repeat(30, 25px);
+    grid-template-rows: repeat(30, 25px);
+    gap: 1px;
 }
-#info-area .group { margin-bottom: 6px; }
-#info-area p { display: block; margin: 2px 0; }
-#info-area hr { border: 0; border-top: 1px solid #fff; margin: 6px 0; }
-#upgrade-shop, #level-up-overlay, #overlay, #reset-confirmation { font-size: 2em; }
-#upgrade-shop { font-size: 1.5em; padding: 20px; }
-.upgrade-item {
-    margin-bottom: 15px; padding: 10px;
-    border: 1px solid #fff; border-radius: 5px;
+.cell {
+    width: 25px;
+    height: 25px;
+    text-align: center;
+    line-height: 25px;
+    border: 1px solid #333;
+    font-size: 12px;
+    transition: background-color 0.2s;
 }
-.upgrade-item button { margin-left: 10px; }
-.choice-button, #upgrade-button { width: 200px; }
-#choices, #upgrades { display: flex; flex-direction: column; gap: 10px; }
-#permanent-score {
-    position: absolute; top: 10px; right: 10px;
-    font-size: 1em; color: #fff; z-index: 10;
+.ally { color: #0f0; }
+.enemy { color: #f00; }
+.moveHighlight { background-color: rgba(0,255,0,0.3); }
+.attackHighlight { background-color: rgba(255,0,0,0.3); }
+#commandPanel { margin-top: 10px; display: flex; gap: 10px; }
+button { padding: 5px 10px; }
+#info { margin-top: 10px; }
+#unitList {
+    width: 200px;
+}
+.unitItem {
+    margin-bottom: 5px;
+}
+.currentTurn { font-weight: bold; background-color: rgba(255,255,0,0.2); padding: 2px; }
+.hpBar {
+    display: inline-block;
+    width: 60px;
+    height: 8px;
+    background-color: #333;
+    margin-left: 5px;
+    vertical-align: middle;
+}
+.hpFill {
+    height: 100%;
+    background-color: #f00;
 }
 </style>
 </head>
 <body>
 
-<canvas id="gameCanvas" width="800" height="600"></canvas>
-
-<!-- トップ画面 -->
-<div id="top-menu">
-    <button id="start-game">ゲームスタート</button>
-    <button id="open-shop">能力開放</button>
-    <button id="reset-data">初期化</button>
+<div id="titleScreen" class="active">
+    <h1>タクティクス</h1>
+    <button id="startBtn">始める</button>
 </div>
 
-<!-- ゲーム情報 -->
-<div id="info-area">
-    <p>時間: <span id="time">10.00</span>s</p>
-    <p>スコア: <span id="score">0</span></p>
-    <p>レベル: <span id="level">1</span></p>
-    <p>敵数: <span id="enemyCount">0</span></p>
-    <hr>
-    <p>移動速度: <span id="stat-speed">0</span></p>
-    <p>攻撃間隔(ms): <span id="stat-attack">0</span></p>
-    <p>弾速: <span id="stat-bullet">0</span></p>
-    <p>初期時間: <span id="stat-time">0</span></p>
-</div>
-
-<div id="permanent-score">
-    貯蓄スコア: <span id="saved-score">0</span>
-</div>
-
-<!-- ゲームオーバー -->
-<div id="overlay">
-    ゲームオーバー！<br>
-    <span id="finalScore">スコア: 0</span>
-    <button id="upgrade-button">能力強化</button>
-    <button id="restart-button">もう一度</button>
-</div>
-
-<!-- レベルアップ -->
-<div id="level-up-overlay">
-    レベルアップ！<br>
-    <div id="choices"></div>
-    <button id="later-button">後で</button>
-</div>
-
-<!-- ショップ -->
-<div id="upgrade-shop">
-    <h2>能力強化ショップ</h2>
-    <div id="upgrades">
-        <div class="upgrade-item">
-            移動速度アップ: <span id="speed-level">0</span>
-            <button id="upgrade-speed">強化 (コスト: 50)</button>
+<div id="gameScreen">
+    <div id="gameContainer">
+        <div>
+            <div id="map"></div>
+            <div id="commandPanel">
+                <button id="moveBtn">移動</button>
+                <button id="attackBtn">攻撃</button>
+                <button id="endTurnBtn">終了</button>
+            </div>
+            <div id="info"></div>
         </div>
-        <div class="upgrade-item">
-            攻撃速度アップ: <span id="attack-level">0</span>
-            <button id="upgrade-attack">強化 (コスト: 50)</button>
-        </div>
-        <div class="upgrade-item">
-            弾速アップ: <span id="bullet-level">0</span>
-            <button id="upgrade-bullet">強化 (コスト: 50)</button>
-        </div>
-        <div class="upgrade-item">
-            プレイ時間延長: <span id="time-level">0</span>
-            <button id="upgrade-time">強化 (コスト: 50)</button>
+        <div id="unitList">
+            <h3>キャラクターリスト</h3>
+            <div id="unitsContainer"></div>
         </div>
     </div>
-    <button id="back-button">戻る</button>
-</div>
-
-<!-- 初期化確認 -->
-<div id="reset-confirmation">
-    データを初期化しますか？<br>
-    <button id="confirm-reset">はい</button>
-    <button id="cancel-reset">キャンセル</button>
 </div>
 
 <script>
-const canvas=document.getElementById('gameCanvas');
-const ctx=canvas.getContext('2d');
-const infoTime=document.getElementById('time');
-const infoLevel=document.getElementById('level');
-const infoEnemyCount=document.getElementById('enemyCount');
-const infoArea=document.getElementById('info-area');
-const overlay=document.getElementById('overlay');
-const finalScoreDisplay=document.getElementById('finalScore');
-const restartButton=document.getElementById('restart-button');
-const levelUpOverlay=document.getElementById('level-up-overlay');
-const choicesContainer=document.getElementById('choices');
-const laterButton=document.getElementById('later-button');
-const upgradeShop=document.getElementById('upgrade-shop');
-const upgradeButton=document.getElementById('upgrade-button');
-const backButton=document.getElementById('back-button');
-const savedScoreDisplay=document.getElementById('saved-score');
-const speedLevelDisplay=document.getElementById('speed-level');
-const attackLevelDisplay=document.getElementById('attack-level');
-const bulletLevelDisplay=document.getElementById('bullet-level');
-const timeLevelDisplay=document.getElementById('time-level');
-const upgradeSpeedButton=document.getElementById('upgrade-speed');
-const upgradeAttackButton=document.getElementById('upgrade-attack');
-const upgradeBulletButton=document.getElementById('upgrade-bullet');
-const upgradeTimeButton=document.getElementById('upgrade-time');
-const statSpeedDisplay=document.getElementById('stat-speed');
-const statAttackDisplay=document.getElementById('stat-attack');
-const statBulletDisplay=document.getElementById('stat-bullet');
-const statTimeDisplay=document.getElementById('stat-time');
-const topMenu=document.getElementById('top-menu');
-const startButton=document.getElementById('start-game');
-const openShopButton=document.getElementById('open-shop');
-const resetButton=document.getElementById('reset-data');
-const resetConfirmation=document.getElementById('reset-confirmation');
-const confirmResetButton=document.getElementById('confirm-reset');
-const cancelResetButton=document.getElementById('cancel-reset');
+const classes = {
+    'ナイト': {move:3, range:1, spd:4, atk:3, hp:30},
+    '竜騎士': {move:3, range:2, spd:5, atk:3, hp:30},
+    'アーチャー': {move:4, range:3, spd:6, atk:3, hp:30},
+    '治癒士': {move:3, range:3, spd:3, atk:3, hp:30},
+    '魔術士': {move:3, range:3, spd:2, atk:3, hp:30},
+    '幻術士': {move:3, range:3, spd:1, atk:3, hp:30},
+    'シーフ': {move:4, range:1, spd:7, atk:3, hp:30},
+};
 
-let gameOver=false, timer=10, score=0, lastTimestamp=0, isPaused=false;
-let savedScore=parseInt(localStorage.getItem('savedScore')||'0');
-let permanentUpgrades=JSON.parse(localStorage.getItem('permanentUpgrades'))||{speed:0,attack:0,bullet:0,time:0};
-let levelBonus={speed:0,attack:0,bullet:0};
+const mapSize = 30;
+let map = [];
+let units = [];
+let turnOrder = [];
+let currentUnitIndex = 0;
+let selectedUnit = null;
+let actionMode = null;
 
-let enemies=[], bullets=[], expGems=[];
-let bulletSpeed=5;
-const enemySpawnInterval=300;
-let lastEnemySpawnTime=0;
-
-const player={x:canvas.width/2,y:canvas.height/2,size:20,speed:3,dx:0,dy:0,bulletCooldown:500,lastBulletTime:0,exp:0,level:1,expToNextLevel:100};
-
-// ===========================
-// UI更新
-// ===========================
-function updateStatUI(){
-    statSpeedDisplay.textContent=`${(3+permanentUpgrades.speed*0.5+levelBonus.speed*0.5).toFixed(1)}`;
-    statAttackDisplay.textContent=`${(500*Math.pow(0.9,permanentUpgrades.attack)*Math.pow(0.9,levelBonus.attack)).toFixed(0)}`;
-    statBulletDisplay.textContent=`${(5+permanentUpgrades.bullet+levelBonus.bullet).toFixed(1)}`;
-    statTimeDisplay.textContent=`${(10+permanentUpgrades.time*5).toFixed(0)}s`;
-    savedScoreDisplay.textContent=savedScore;
-    speedLevelDisplay.textContent=permanentUpgrades.speed;
-    attackLevelDisplay.textContent=permanentUpgrades.attack;
-    bulletLevelDisplay.textContent=permanentUpgrades.bullet;
-    timeLevelDisplay.textContent=permanentUpgrades.time;
-}
-
-// ===========================
-// ゲームループ関連
-// ===========================
-function draw(){
-    ctx.fillStyle='#000';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle='#00f';
-    ctx.fillRect(player.x-player.size/2,player.y-player.size/2,player.size,player.size);
-    ctx.fillStyle='#f00';
-    enemies.forEach(e=>{ctx.beginPath();ctx.arc(e.x,e.y,e.size,0,Math.PI*2);ctx.fill();});
-    ctx.fillStyle='#0f0';
-    bullets.forEach(b=>{ctx.fillRect(b.x-2,b.y-2,4,4);});
-    ctx.fillStyle='#ff0';
-    expGems.forEach(g=>{ctx.beginPath();ctx.arc(g.x,g.y,g.size,0,Math.PI*2);ctx.fill();});
-}
-
-function update(deltaTime){
-    if(gameOver||isPaused)return;
-    timer-=deltaTime/1000;
-    infoTime.textContent=timer.toFixed(2);
-    if(timer<=0){
-        timer=0;
-        gameOver=true;
-        savedScore+=score;
-        localStorage.setItem('savedScore',savedScore);
-        finalScoreDisplay.textContent=`スコア: ${score}`;
-        overlay.style.display='flex';
-        updateStatUI();
-        return;
+function createMap() {
+    const mapDiv = document.getElementById('map');
+    mapDiv.innerHTML = '';
+    map = [];
+    for (let y = 0; y < mapSize; y++) {
+        const row = [];
+        for (let x = 0; x < mapSize; x++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.dataset.x = x;
+            cell.dataset.y = y;
+            mapDiv.appendChild(cell);
+            row.push(null);
+        }
+        map.push(row);
     }
-    player.x+=player.dx*player.speed;
-    player.y+=player.dy*player.speed;
-    player.x=Math.max(player.size/2,Math.min(canvas.width-player.size/2,player.x));
-    player.y=Math.max(player.size/2,Math.min(canvas.height-player.size/2,player.y));
+}
 
-    const now=performance.now();
-    if(now-lastEnemySpawnTime>enemySpawnInterval){spawnEnemy();lastEnemySpawnTime=now;}
-
-    enemies.forEach(e=>{
-        const a=Math.atan2(player.y-e.y,player.x-e.x);
-        e.x+=Math.cos(a);
-        e.y+=Math.sin(a);
-    });
-
-    if(enemies.length>0&&now-player.lastBulletTime>player.bulletCooldown){
-        let closest=null,minDist=Infinity;
-        enemies.forEach(e=>{
-            const d=Math.hypot(player.x-e.x,player.y-e.y);
-            if(d<minDist){minDist=d;closest=e;}
-        });
-        if(closest){
-            const a=Math.atan2(closest.y-player.y,closest.x-player.x);
-            bullets.push({x:player.x,y:player.y,dx:Math.cos(a)*bulletSpeed,dy:Math.sin(a)*bulletSpeed});
-            player.lastBulletTime=now;
+function placeUnits() {
+    function getRandomEmpty() {
+        while(true){
+            const x = Math.floor(Math.random()*mapSize);
+            const y = Math.floor(Math.random()*mapSize);
+            if(!map[y][x]) return {x,y};
         }
     }
-    bullets.forEach(b=>{b.x+=b.dx;b.y+=b.dy;});
-    expGems.forEach(g=>{
-        const a=Math.atan2(player.y-g.y,player.x-g.x);
-        g.x+=Math.cos(a)*2;g.y+=Math.sin(a)*2;
-    });
-    checkCollisions();
-    if(player.exp>=player.expToNextLevel){
-        player.level++;player.exp=0;player.expToNextLevel+=50;
-        infoLevel.textContent=player.level;
-        isPaused=true;showLevelUpChoices();
+
+    units = [];
+    for(let i=0;i<3;i++){
+        let allyPos = getRandomEmpty();
+        let enemyPos = getRandomEmpty();
+        let allyClass = Object.keys(classes)[Math.floor(Math.random()*7)];
+        let enemyClass = Object.keys(classes)[Math.floor(Math.random()*7)];
+        let ally = {...classes[allyClass], type:'ally', name:allyClass, x:allyPos.x, y:allyPos.y, maxHp:classes[allyClass].hp};
+        let enemy = {...classes[enemyClass], type:'enemy', name:enemyClass, x:enemyPos.x, y:enemyPos.y, maxHp:classes[enemyClass].hp};
+        units.push(ally);
+        units.push(enemy);
+        map[ally.y][ally.x] = ally;
+        map[enemy.y][enemy.x] = enemy;
     }
-    infoEnemyCount.textContent=enemies.length;
-    updateStatUI();
+    turnOrder = [...units].sort((a,b)=>b.spd-a.spd);
+    currentUnitIndex = 0;
 }
 
-function checkCollisions(){
-    enemies.forEach(e=>{
-        const d=Math.hypot(player.x-e.x,player.y-e.y);
-        if(d<player.size/2+e.size){
-            gameOver=true;savedScore+=score;
-            localStorage.setItem('savedScore',savedScore);
-            finalScoreDisplay.textContent=`スコア: ${score}`;
-            overlay.style.display='flex';
+function renderMap() {
+    for(let y=0;y<mapSize;y++){
+        for(let x=0;x<mapSize;x++){
+            const cell = document.querySelector(`.cell[data-x='${x}'][data-y='${y}']`);
+            const unit = map[y][x];
+            cell.classList.remove('ally','enemy','moveHighlight','attackHighlight');
+            if(unit){
+                cell.textContent = unit.name[0];
+                cell.classList.add(unit.type);
+            } else { cell.textContent=''; }
         }
+    }
+    if(selectedUnit) {
+        highlightMove(selectedUnit);
+        highlightAttack(selectedUnit);
+    }
+    updateInfo();
+    updateUnitList();
+}
+
+function updateInfo() {
+    const info = document.getElementById('info');
+    if(turnOrder.length===0) { info.innerHTML='全滅！'; return; }
+    const unit = turnOrder[currentUnitIndex];
+    info.innerHTML = `ターン: ${unit.name} (${unit.type}) HP:${unit.hp} <br> コマンドを選択してください`;
+}
+
+function updateUnitList(){
+    const container = document.getElementById('unitsContainer');
+    container.innerHTML='';
+    turnOrder.forEach((unit, idx)=>{
+        const div = document.createElement('div');
+        div.className='unitItem';
+        if(idx===currentUnitIndex) div.classList.add('currentTurn');
+        div.innerHTML=`${unit.name} (${unit.type}) HP: <div class="hpBar"><div class="hpFill" style="width:${unit.hp/unit.maxHp*100}%"></div></div>`;
+        container.appendChild(div);
     });
-    bullets=bullets.filter(b=>{
-        if(b.x<0||b.x>canvas.width||b.y<0||b.y>canvas.height)return false;
-        let hit=false;
-        enemies=enemies.filter(e=>{
-            if(Math.hypot(b.x-e.x,b.y-e.y)<e.size){
-                if(!hit){hit=true;score+=10;player.exp+=20;expGems.push({x:e.x,y:e.y,size:5});}
-                return false;
+}
+
+function highlightMove(unit){
+    for(let y=0;y<mapSize;y++){
+        for(let x=0;x<mapSize;x++){
+            const cell = document.querySelector(`.cell[data-x='${x}'][data-y='${y}']`);
+            const targetCell = map[y][x];
+            if(targetCell && targetCell.type==='enemy') continue; // 敵ブロック
+            if(unit.x===x || unit.y===y){
+                if(Math.abs(unit.x-x)+Math.abs(unit.y-y)<=unit.move){
+                    cell.classList.add('moveHighlight');
+                }
             }
-            return true;
-        });
-        return !hit;
-    });
-    expGems=expGems.filter(g=>{
-        if(Math.hypot(player.x-g.x,player.y-g.y)<player.size/2+g.size){
-            player.exp+=10;return false;
         }
-        return true;
-    });
-}
-
-function spawnEnemy(){
-    const edge=Math.floor(Math.random()*4);
-    let x,y;
-    switch(edge){
-        case 0:x=Math.random()*canvas.width;y=-20;break;
-        case 1:x=canvas.width+20;y=Math.random()*canvas.height;break;
-        case 2:x=Math.random()*canvas.width;y=canvas.height+20;break;
-        case 3:x=-20;y=Math.random()*canvas.height;break;
-    }
-    enemies.push({x,y,size:10});
-}
-
-function showLevelUpChoices(){
-    levelUpOverlay.style.display='flex';
-    choicesContainer.innerHTML='';
-    const options=[
-        {text:'攻撃力アップ',effect:()=>{levelBonus.attack+=1;player.bulletCooldown*=0.9;}},
-        {text:'弾速アップ',effect:()=>{levelBonus.bullet+=1;bulletSpeed+=1;}},
-        {text:'移動速度アップ',effect:()=>{levelBonus.speed+=1;player.speed+=0.5;}}
-    ];
-    options.sort(()=>0.5-Math.random()).slice(0,2).forEach(c=>{
-        const btn=document.createElement('button');
-        btn.textContent=c.text;btn.classList.add('choice-button');
-        btn.addEventListener('click',()=>{c.effect();resumeGame();});
-        choicesContainer.appendChild(btn);
-    });
-}
-
-function resetGame(){
-    gameOver=false;
-    timer=10+permanentUpgrades.time*5;
-    score=0;enemies=[];bullets=[];expGems=[];
-    isPaused=false;
-    player.x=canvas.width/2;player.y=canvas.height/2;
-    player.dx=0;player.dy=0;player.exp=0;player.level=1;player.expToNextLevel=100;
-    player.speed=3+permanentUpgrades.speed*0.5;
-    player.bulletCooldown=500*Math.pow(0.9,permanentUpgrades.attack);
-    bulletSpeed=5+permanentUpgrades.bullet;
-    lastEnemySpawnTime=0;player.lastBulletTime=0;
-    overlay.style.display='none';upgradeShop.style.display='none';infoArea.style.display='flex';
-    updateStatUI();
-    requestAnimationFrame(gameLoop);
-}
-
-function resumeGame(){
-    isPaused=false;levelUpOverlay.style.display='none';
-    updateStatUI();requestAnimationFrame(gameLoop);
-}
-
-// === ショップ関連 ===
-function showUpgradeShop(){
-    overlay.style.display='none';upgradeShop.style.display='flex';updateUpgradeShopUI();
-}
-
-function updateUpgradeShopUI(){
-    savedScoreDisplay.textContent=savedScore;
-    const list=['speed','attack','bullet','time'];
-    list.forEach(type=>{
-        const cost=50*(permanentUpgrades[type]+1);
-        const btn=document.getElementById(`upgrade-${type}`);
-        const label=document.getElementById(`${type}-level`);
-        label.textContent=permanentUpgrades[type];
-        btn.textContent=`強化 (コスト: ${cost})`;
-        btn.disabled=savedScore<cost;
-    });
-}
-
-function upgradeAbility(type,cost){
-    if(savedScore>=cost){
-        savedScore-=cost;
-        permanentUpgrades[type]++;
-        localStorage.setItem('savedScore',savedScore);
-        localStorage.setItem('permanentUpgrades',JSON.stringify(permanentUpgrades));
-        updateUpgradeShopUI();updateStatUI();
     }
 }
 
-// === リスナー ===
-resetButton.addEventListener('click',()=>{resetConfirmation.style.display='flex';});
-confirmResetButton.addEventListener('click',()=>{
-    savedScore=0;
-    permanentUpgrades={speed:0,attack:0,bullet:0,time:0};
-    localStorage.setItem('savedScore',savedScore);
-    localStorage.setItem('permanentUpgrades',JSON.stringify(permanentUpgrades));
-    resetConfirmation.style.display='none';updateStatUI();resetGame();
+function highlightAttack(unit){
+    for(let y=0;y<mapSize;y++){
+        for(let x=0;x<mapSize;x++){
+            const target = map[y][x];
+            if(target && target.type!==unit.type){
+                if(Math.abs(unit.x-x)+Math.abs(unit.y-y)<=unit.range){
+                    const cell = document.querySelector(`.cell[data-x='${x}'][data-y='${y}']`);
+                    cell.classList.add('attackHighlight');
+                }
+            }
+        }
+    }
+}
+
+// 移動
+document.getElementById('moveBtn').addEventListener('click', ()=>{
+    if(selectedUnit.hasMoved){ alert('移動はすでに行いました'); return; }
+    actionMode='move';
 });
-cancelResetButton.addEventListener('click',()=>{resetConfirmation.style.display='none';});
 
-document.addEventListener('keydown',e=>{
-    if(gameOver||isPaused)return;
-    switch(e.key){
-        case'ArrowUp':case'w':player.dy=-1;break;
-        case'ArrowDown':case's':player.dy=1;break;
-        case'ArrowLeft':case'a':player.dx=-1;break;
-        case'ArrowRight':case'd':player.dx=1;break;
-    }
+// 攻撃
+document.getElementById('attackBtn').addEventListener('click', ()=>{
+    if(selectedUnit.hasAttacked){ alert('攻撃はすでに行いました'); return; }
+    actionMode='attack';
 });
-document.addEventListener('keyup',e=>{
-    if(gameOver||isPaused)return;
-    switch(e.key){
-        case'ArrowUp':case'w':case'ArrowDown':case's':player.dy=0;break;
-        case'ArrowLeft':case'a':case'ArrowRight':case'd':player.dx=0;break;
-    }
-});
-restartButton.addEventListener('click',resetGame);
-upgradeButton.addEventListener('click',showUpgradeShop);
-laterButton.addEventListener('click',resumeGame);
-backButton.addEventListener('click',()=>{upgradeShop.style.display='none';overlay.style.display='flex';});
-upgradeSpeedButton.addEventListener('click',()=>{upgradeAbility('speed',50*(permanentUpgrades.speed+1));});
-upgradeAttackButton.addEventListener('click',()=>{upgradeAbility('attack',50*(permanentUpgrades.attack+1));});
-upgradeBulletButton.addEventListener('click',()=>{upgradeAbility('bullet',50*(permanentUpgrades.bullet+1));});
-upgradeTimeButton.addEventListener('click',()=>{upgradeAbility('time',50*(permanentUpgrades.time+1));});
-startButton.addEventListener('click',()=>{topMenu.style.display='none';infoArea.style.display='flex';resetGame();});
-openShopButton.addEventListener('click',()=>{topMenu.style.display='none';showUpgradeShop();});
 
-function gameLoop(timestamp){
-    const deltaTime=timestamp-lastTimestamp;lastTimestamp=timestamp;
-    update(deltaTime);draw();
-    if(!gameOver&&!isPaused)requestAnimationFrame(gameLoop);
+function moveUnit(unit, targetX, targetY){
+    if(unit.hasMoved) return false;
+    const dist = Math.abs(unit.x-targetX)+Math.abs(unit.y-targetY);
+    if(dist>unit.move) { alert('移動範囲外'); return false; }
+    const targetCell = map[targetY][targetX];
+    if(targetCell && targetCell.type==='enemy') { alert('移動先に敵がいます'); return false; }
+    if(unit.x!==targetX && unit.y!==targetY) { alert('斜め移動は禁止'); return false; }
+    map[unit.y][unit.x] = null;
+    unit.x = targetX; unit.y = targetY;
+    map[unit.y][unit.x] = unit;
+    unit.hasMoved = true;  // 移動済みに設定
+    renderMap();
+    return true;
 }
 
-// 初期化
-topMenu.style.display='flex';infoArea.style.display='none';updateStatUI();
+function attackUnit(attacker, target){
+    if(attacker.hasAttacked) return false;
+    const dist = Math.abs(attacker.x-target.x)+Math.abs(attacker.y-target.y);
+    if(dist>attacker.range){ alert('攻撃範囲外'); return false; }
+    target.hp -= attacker.atk;
+    attacker.hasAttacked = true;  // 攻撃済みに設定
+    if(target.hp<=0){
+        map[target.y][target.x]=null;
+        units = units.filter(u=>u!==target);
+        turnOrder = turnOrder.filter(u=>u!==target);
+        alert(`${target.name}を倒した！`);
+    }
+    renderMap();
+    return true;
+}
+
+// 次ターン
+function nextTurn(){
+    if(turnOrder.length===0) return;
+    currentUnitIndex++;
+    if(currentUnitIndex>=turnOrder.length) currentUnitIndex=0;
+    selectedUnit = turnOrder[currentUnitIndex];
+    selectedUnit.hasMoved = false;
+    selectedUnit.hasAttacked = false;
+    renderMap();
+    if(selectedUnit.type==='enemy') setTimeout(()=>enemyAI(selectedUnit), 500);
+}
+
+
+function enemyAI(unit){
+    let targets = units.filter(u=>u.type==='ally');
+    if(targets.length===0){ alert('敵全滅！'); return; }
+    targets.sort((a,b)=>{
+        return (Math.abs(a.x-unit.x)+Math.abs(a.y-unit.y))-(Math.abs(b.x-unit.x)+Math.abs(b.y-unit.y));
+    });
+    const target = targets[0];
+    const dx = target.x-unit.x;
+    const dy = target.y-unit.y;
+    if(Math.abs(dx)+Math.abs(dy)<=unit.range){
+        attackUnit(unit,target);
+    } else {
+        let moveX = unit.x; let moveY = unit.y;
+        if(dx!==0) moveX += dx>0?1:-1;
+        else if(dy!==0) moveY += dy>0?1:-1;
+        if(!map[moveY][moveX] || map[moveY][moveX].type==='ally') moveUnit(unit,moveX,moveY);
+    }
+    setTimeout(nextTurn,500);
+}
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+    document.getElementById('titleScreen').classList.remove('active');
+    document.getElementById('gameScreen').classList.add('active');
+    createMap();
+    placeUnits();
+    selectedUnit = turnOrder[currentUnitIndex];
+    renderMap();
+});
+
+document.getElementById('moveBtn').addEventListener('click', ()=>{ actionMode='move'; });
+document.getElementById('attackBtn').addEventListener('click', ()=>{ actionMode='attack'; });
+document.getElementById('endTurnBtn').addEventListener('click', ()=>{ nextTurn(); });
+
+document.getElementById('map').addEventListener('click', (e)=>{
+    if(!actionMode) return;
+    const cell = e.target;
+    if(!cell.classList.contains('cell')) return;
+    const x = parseInt(cell.dataset.x);
+    const y = parseInt(cell.dataset.y);
+    const unit = turnOrder[currentUnitIndex];
+    if(actionMode==='move'){
+        if(moveUnit(unit,x,y)) actionMode=null;
+    } else if(actionMode==='attack'){
+        const target = map[y][x];
+        if(target && target.type!==unit.type){
+            if(attackUnit(unit,target)) actionMode=null;
+        }
+    }
+});
 </script>
-
 </body>
 </html>
