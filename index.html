@@ -2,43 +2,255 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>SFドローンシミュレーション</title>
+<title>能力強化付きドローンゲーム</title>
 <style>
 body {
     background-color: #000;
-    color: #fff;
+    color: #0ff;
+    font-family: monospace;
     margin: 0;
+    overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
-    font-family: monospace;
-    overflow: hidden;
-    position: relative;
 }
-canvas { border: 1px solid #fff; }
-#top-menu, #overlay, #level-up-overlay, #upgrade-shop, #reset-confirmation {
-    position: absolute; top: 0; left: 0;
-    width: 100%; height: 100%;
+#gameCanvas {
+    background-color: #01010f;
+    border: 2px solid #0ff;
+}
+#ui {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+}
+#shop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.95);
     display: none;
     flex-direction: column;
-    justify-content: center;
     align-items: center;
-    background-color: rgba(0,0,0,0.85);
-    text-align: center;
-    z-index: 20;
+    justify-content: center;
+    color: #0ff;
 }
-#top-menu { display: flex; font-size: 2em; }
-#top-menu button {
-    margin: 10px; padding: 20px 40px; font-size: 1em;
-    cursor: pointer; background-color: #00f; color: #fff;
-    border: none; border-radius: 5px;
+button {
+    background: #022;
+    color: #0ff;
+    border: 1px solid #0ff;
+    padding: 10px 20px;
+    margin: 5px;
+    cursor: pointer;
+    font-family: monospace;
 }
-#info-area {
-    position: fixed; top: 10px; left: 10px;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 10px 14px; border-radius: 8px;
-    font-size: 14px; color: #fff;
+button:hover {
+    background: #033;
 }
-#info-area p { margin: 2px 0; }
-#info-a
+.shop-item {
+    margin: 10px;
+    font-size: 18px;
+}
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<div id="ui">
+    <div>スコア: <span id="score">0</span></div>
+    <div>残り時間: <span id="time">60</span>s</div>
+    <div>コイン: <span id="coins">0</span></div>
+    <button id="openShop">能力強化</button>
+</div>
+
+<div id="shop">
+    <h1>能力強化ショップ</h1>
+    <div id="shopItems"></div>
+    <button id="closeShop">閉じる</button>
+</div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let player = { x: 400, y: 300, size: 15, speed: 3 };
+let enemies = [];
+let score = 0;
+let coins = 0;
+let timeLeft = 60; // 秒
+
+// 能力強化データ
+let upgrades = {
+    attack: { level: 1, cost: 10, effect: "攻撃力+1" },
+    defense: { level: 1, cost: 10, effect: "防御力+1" },
+    hp: { level: 1, cost: 15, effect: "HP最大値+10" },
+    speed: { level: 1, cost: 20, effect: "移動速度+0.5" },
+    time: { level: 1, cost: 25, effect: "プレイ時間+10秒" } // ← 追加項目！
+};
+
+let gameInterval;
+let spawnInterval;
+let timerInterval;
+
+// 移動キー入力管理
+const keys = {};
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+// 敵生成
+function spawnEnemy() {
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height;
+    enemies.push({ x, y, size: 10, dx: (Math.random()-0.5)*2, dy: (Math.random()-0.5)*2 });
+}
+
+// ゲームループ
+function update() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // プレイヤー移動
+    if (keys["w"] || keys["W"]) player.y -= player.speed;
+    if (keys["s"] || keys["S"]) player.y += player.speed;
+    if (keys["a"] || keys["A"]) player.x -= player.speed;
+    if (keys["d"] || keys["D"]) player.x += player.speed;
+
+    // 壁判定
+    player.x = Math.max(player.size, Math.min(canvas.width - player.size, player.x));
+    player.y = Math.max(player.size, Math.min(canvas.height - player.size, player.y));
+
+    // 敵移動
+    enemies.forEach(e => {
+        e.x += e.dx;
+        e.y += e.dy;
+        if (e.x < e.size || e.x > canvas.width - e.size) e.dx *= -1;
+        if (e.y < e.size || e.y > canvas.height - e.size) e.dy *= -1;
+    });
+
+    // 当たり判定
+    enemies.forEach((e,i)=>{
+        let dx = e.x - player.x;
+        let dy = e.y - player.y;
+        let dist = Math.sqrt(dx*dx+dy*dy);
+        if (dist < player.size + e.size) {
+            enemies.splice(i,1);
+            score += 10;
+            coins += 5;
+            document.getElementById("score").textContent = score;
+            document.getElementById("coins").textContent = coins;
+        }
+    });
+
+    // 描画
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.size, 0, Math.PI*2);
+    ctx.fillStyle = "#0ff";
+    ctx.fill();
+    ctx.closePath();
+
+    enemies.forEach(e=>{
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.size, 0, Math.PI*2);
+        ctx.fillStyle = "#f00";
+        ctx.fill();
+        ctx.closePath();
+    });
+}
+
+// タイマー
+function startTimer() {
+    timerInterval = setInterval(()=>{
+        timeLeft--;
+        document.getElementById("time").textContent = timeLeft;
+        if (timeLeft <= 0) endGame();
+    },1000);
+}
+
+// ゲーム開始
+function startGame() {
+    gameInterval = setInterval(update, 16);
+    spawnInterval = setInterval(spawnEnemy, 1000);
+    startTimer();
+}
+
+// 終了
+function endGame() {
+    clearInterval(gameInterval);
+    clearInterval(spawnInterval);
+    clearInterval(timerInterval);
+    alert("時間切れ！スコア: "+score);
+}
+
+// ショップ表示
+const shop = document.getElementById("shop");
+document.getElementById("openShop").onclick = ()=>{
+    clearInterval(gameInterval);
+    clearInterval(spawnInterval);
+    clearInterval(timerInterval);
+    renderShop();
+    shop.style.display = "flex";
+};
+document.getElementById("closeShop").onclick = ()=>{
+    shop.style.display = "none";
+    startGame();
+};
+
+// ショップ内容
+function renderShop(){
+    const shopItems = document.getElementById("shopItems");
+    shopItems.innerHTML = "";
+    for(let key in upgrades){
+        const up = upgrades[key];
+        const div = document.createElement("div");
+        div.className = "shop-item";
+        div.innerHTML = `
+            <b>${up.effect}</b><br>
+            Lv.${up.level} / コスト:${up.cost}コイン
+            <br><button onclick="buyUpgrade('${key}')">強化する</button>
+        `;
+        shopItems.appendChild(div);
+    }
+}
+
+// 強化処理
+function buyUpgrade(type){
+    const up = upgrades[type];
+    if(coins >= up.cost){
+        coins -= up.cost;
+        up.level++;
+        up.cost = Math.floor(up.cost * 1.5);
+        applyUpgrade(type);
+        renderShop();
+        document.getElementById("coins").textContent = coins;
+    } else {
+        alert("コインが足りません！");
+    }
+}
+
+// 強化反映
+function applyUpgrade(type){
+    switch(type){
+        case "attack":
+            // 攻撃力はスコア倍率に影響させても良い
+            score += 0; 
+            break;
+        case "defense":
+            break;
+        case "hp":
+            player.size += 1;
+            break;
+        case "speed":
+            player.speed += 0.5;
+            break;
+        case "time":
+            timeLeft += 10; // ← プレイ時間追加
+            document.getElementById("time").textContent = timeLeft;
+            break;
+    }
+}
+
+startGame();
+</script>
+</body>
+</html>
