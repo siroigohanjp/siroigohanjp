@@ -77,13 +77,17 @@
 
         // ==== キー入力 ====
         window.addEventListener('keydown', (e) => {
-            if (gameState === GAME_STATE.TITLE) {
-                startGame();
-            }
-            if (keys.hasOwnProperty(e.key.toLowerCase())) { // 小文字化して比較
-                keys[e.key.toLowerCase()] = true;
-            }
-        });
+    // タイトル or ゲームオーバー でリスタート可能に
+    if (gameState === GAME_STATE.TITLE || gameState === GAME_STATE.GAME_OVER) {
+        startGame();
+        return; // 入力を続けて処理しない
+    }
+
+    if (keys.hasOwnProperty(e.key.toLowerCase())) {
+        keys[e.key.toLowerCase()] = true;
+    }
+});
+
 
         window.addEventListener('keyup', (e) => {
             if (keys.hasOwnProperty(e.key.toLowerCase())) {
