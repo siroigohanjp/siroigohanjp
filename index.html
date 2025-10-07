@@ -1,1158 +1,295 @@
-<div id="titleScreen" style="position:absolute;top:0;left:0;width:100%;height:100%;background:#000;color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:10">
-    <h1>ミニローグライク v0.0.1</h1>
-    <button id="startBtn">はじめる</button>
-    <button id="resetBtn">初期化</button>
-    <button id="supportBtn">サポートセンター</button>
-</div>
-
-<div id="gameUI" style="display:none;">
-
-
-
-
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ミニローグライク</title>
-<style>
-:root{--cell:18px}
-body{font-family:system-ui,-apple-system,"Yu Gothic UI","Hiragino Kaku Gothic ProN","Noto Sans JP","Segoe UI",Roboto;margin:8px;background:#111;color:#eee}
-.container{display:flex;gap:12px}
-#game{background:#222;padding:8px;border-radius:8px;overflow:auto;max-height:78vh}
-#map{display:grid;grid-gap:1px;background:#333;padding:6px;max-width:calc(var(--cell)*50 + 20px)}
-.tile{width:var(--cell);height:var(--cell);display:flex;align-items:center;justify-content:center;font-size:12px;user-select:none}
-.tile.floor{background:#111;color:#eee}
-.tile.wall{background:#555;color:#eee}
-.tile.player{background:#1e90ff;color:#fff}
-.tile.enemy{background:#a33;color:#fff}
-.tile.chest{background:#b8860b;color:#fff}
-.tile.stairs{background:#6a0dad;color:#fff}
-.tile.item{background:#228b22;color:#fff}
-.tile.dark{background:#000;color:#000 !important}
-.tile.npc{background:#ff8c00;color:#000;font-weight:bold}
-.tile.npc.merchant{background:#ffcc00;color:#000}     
-.tile.npc.blacksmith{background:#999;color:#fff}     
-.tile.npc.priest{background:#00ccff;color:#000}      
-.tile.npc.chef{background:#ff6666;color:#000}        
-
-.sidebar{min-width:320px;background:#1b1b1b;padding:10px;border-radius:8px}
-.stat{margin-bottom:8px}
-.bag{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.slot{background:#2b2b2b;padding:6px;border-radius:6px;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.slot .name{font-size:12px}
-.slot button{margin-top:6px}
-.equip{display:flex;gap:8px;margin-bottom:8px}
-.equip .box{background:#252525;padding:8px;border-radius:6px;flex:1;text-align:center;cursor:pointer}
-.log{background:#0f0f0f;padding:8px;height:220px;overflow:auto;border-radius:6px}
-.controls{margin-top:8px}
-button{background:#2a2a2a;color:#fff;border:1px solid #444;padding:6px 8px;border-radius:6px}
-.small{font-size:12px;padding:4px 6px}
-.topbar{display:flex;gap:12px;align-items:center;margin-bottom:8px}
-.hud{display:flex;gap:8px;align-items:center}
-.warning{color:#f66}
-</style>
+    <meta charset="UTF-8">
+    <title>Stardust Survivor</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #0d0d1a;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+        canvas {
+            border: 2px solid #555;
+            background-color: #000;
+        }
+        .ui {
+            text-align: center;
+            margin-top: 10px;
+        }
+        .ui-element {
+            margin: 5px;
+            padding: 5px;
+            border: 1px solid #aaa;
+            cursor: pointer;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+    </style>
 </head>
 <body>
-
-    <div class="container">
-  <div id="game">
-    <div id="map"></div>
-
-    <!-- 階数表示 -->
-    <div style="margin-top:8px;font-size:14px">
-      地下: <span id="floorNum">1</span>
-      <button id="returnTitleBtn">タイトルに戻る</button>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="uiContainer" class="ui">
+        <h1 id="gameTitle">Stardust Survivor</h1>
+        <p id="gameMessage">Press WASD to Move, any key to Start</p>
     </div>
 
-    <div style="margin-top:8px;font-size:13px">
-      移動: 矢印キー / WASD.足踏み: space.
-    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const uiContainer = document.getElementById('uiContainer');
+        const gameMessage = document.getElementById('gameMessage');
 
-    <div class="controls" style="margin-top:8px">
-      <button id="wait" class="small">足踏み</button>
-      <button id="npcAction" class="small" disabled>NPCと話す</button>
-      <button id="descend" class="small">階段で降りる</button>
-    </div>
-
-    <div id="log" class="log"></div>
-  </div>
-
-  <div class="sidebar">
-    <div class="stat">
-      <strong>ステータス</strong>
-　　　<div>LV: <span id="lv">1</span> EXP: <span id="exp">0</span> NextExp: <span id="nextExp">10</span></div>
-      <div>攻: <span id="atk">5</span> 防: <span id="def">0</span> 速: <span id="spd">5</span></div>
-      <div>HP: <span id="hp">30</span>/<span id="maxhp">30</span> | 空腹: <span id="hunger">500</span></div>
-    </div>
-    <div class="equip">
-      <div class="box" id="leftBox">左手<br><span id="leftEquip">(なし)</span></div>
-      <div class="box" id="rightBox">右手<br><span id="rightEquip">(なし)</span></div>
-    </div>
-    <div>
-      <<strong>カバン (<span id="bagCap"></span>)</strong>
-      <div id="bag" class="bag"></div>
-    </div>
-  </div>
-</div>
-
-
-<script>
-// -----------------------------
-// 基本設定
-// -----------------------------
-const TILE = { FLOOR:0, WALL:1, CHEST:2, STAIRS:3, NPC:4 }
-let BAG_CAPACITY = 9
-const state = { size: 15, map: [], floor: 1, player: {}, enemies: [], groundItems: {}, npcs: [], log: [], resetPlayer:true }
-function randint(min,max){ return Math.floor(Math.random()*(max-min+1))+min }
-function manhattan(x1,y1,x2,y2){ return Math.abs(x1-x2)+Math.abs(y1-y2) }
-
-
-//デフォルトプレイヤー情報
-function defaultPlayer(){
-  return {
-    x: 1, y: 1,
-    hp: 30, maxhp: 30,
-    atk: 5, def: 0, spd: 5,
-    hunger: 500,
-    bag: [],
-    left: null, right: null,
-    lv: 1,         // ★ レベル
-    exp: 0,        // ★ 現在の経験値
-    nextExp: 10    // ★ 次のレベルに必要な経験値
-  };
-}
-
-
-state.player = defaultPlayer()
-
-
-
-// -----------------------------
-// NPC定義
-// -----------------------------
-const NPC_TYPES = [
-  { type: 'merchant', name: '商人' },
-  { type: 'blacksmith', name: '鍛冶職人' },
-  { type: 'priest', name: '神父' },
-  { type: 'chef', name: '料理人' }
-];
-
-
-
-
-
-
-// -----------------------------
-// マップ生成
-// -----------------------------
-function generateMap(){
-  state.map = []
-  for(let y=0;y<state.size;y++){
-    const row = []
-    for(let x=0;x<state.size;x++){
-      // 外周は必ず壁
-      if(x===0 || y===0 || x===state.size-1 || y===state.size-1){
-        row.push({t:TILE.WALL})
-      } else {
-        row.push({t:(Math.random()<0.2?TILE.WALL:TILE.FLOOR)})
-      }
-    }
-    state.map.push(row)
-  }
-  const sx=randint(1,state.size-2), sy=randint(1,state.size-2)
-  state.map[sy][sx].t=TILE.STAIRS
-  state.mapData = { stairs:[sx,sy] }
-
-  // --- 必ず階段までの通路を掘る ---
-  carvePath(1,1,sx,sy)
-}
-
-
-function carvePath(x1,y1,x2,y2){
-  let x=x1, y=y1
-  while(x!==x2 || y!==y2){
-    state.map[y][x].t = TILE.FLOOR
-    if(Math.random()<0.5){
-      if(x<x2) x++
-      else if(x>x2) x--
-      else if(y<y2) y++
-      else if(y>y2) y--
-    } else {
-      if(y<y2) y++
-      else if(y>y2) y--
-      else if(x<x2) x++
-      else if(x>x2) x--
-    }
-  }
-  state.map[y2][x2].t = TILE.STAIRS
-}
-
-
-
-// 敵生成
-function generateEnemies(){
-  state.enemies = [];
-  const count = randint(3, 6); // 敵の数
-  const stage = Math.floor(state.floor / 6); // 6階ごとに強化段階アップ
-
-  for(let i=0;i<count;i++){
-    let x,y;
-    do{
-      x = randint(1,state.size-2);
-      y = randint(1,state.size-2);
-    } while(state.map[y][x].t!==TILE.FLOOR || (x===1 && y===1));
-
-    state.enemies.push({
-      x, y,
-      hp: 10 + stage * 5,   // HP: 段階ごとに +5
-      atk: 3 + stage * 2,    // 攻撃: 段階ごとに +2
-      def: 1 + stage * 1     // 防御: 段階ごとに +1
-    });
-  }
-}
-
-
-// 戦闘処理
-function attackEnemy(enemy){
-  const stats = computeStats();
-  // 最低ダメージを0に変更
-  const dmg = Math.max(0, stats.atk - enemy.def);
-  if(dmg > 0){
-    enemy.hp -= dmg;
-    log(`敵に${dmg}ダメージ！`);
-  } else {
-    log('攻撃は通じなかった！');
-  }
-
-if(enemy.hp <= 0){
-  log('敵を倒した！');
-
-  // 敵リストから削除
-  state.enemies = state.enemies.filter(e => e!==enemy);
-
-  // 宝箱生成（既存処理）
-  const key = keyAt(enemy.x, enemy.y);
-  state.map[enemy.y][enemy.x].t = TILE.CHEST;
-  state.groundItems[key] = [generateChestItem()];
-  log('敵が宝箱を落とした！');
-
-  // ★ 経験値獲得処理
-  const gainExp = 5; // 敵ごとに調整可
-  state.player.exp += gainExp;
-  log(`経験値${gainExp}を得た！`);
-
-  checkLevelUp();
-}
-
-}
-
-//レベルアップ要素
-function checkLevelUp(){
-  while(state.player.exp >= state.player.nextExp){
-    state.player.exp -= state.player.nextExp;
-    state.player.lv++;
-    state.player.nextExp = Math.floor(state.player.nextExp * 2);
-
-    // ステータス上昇
-    state.player.maxhp += 5;
-    //state.player.hp = state.player.maxhp; // レベルアップ時に全回復
-    state.player.atk += 1;
-    state.player.def += 1;
-    state.player.spd += 1;
-
-    log(`レベル${state.player.lv}に上がった！`);
-  }
-}
-
-
-
-function generateChestItem(){
-  const floor = state.floor;
-  const roll = Math.random();
-  if(roll < 0.4) return {type:'coins', amount:randint(5,10)*floor};
-  else if(roll < 0.7) return {type:'herb'};
-  else if(roll < 0.85) return {type:'mushroom'};
-  else if(roll < 0.95) return {type:'sword', atk:1 + Math.floor(floor/3)};
-  else return {type:'shield', def:1 + Math.floor(floor/3)};
-}
-
-function generateChests(){
-  const chestCount = randint(3,5);
-  for(let i=0;i<chestCount;i++){
-    let x,y;
-    do{
-      x=randint(1,state.size-2); 
-      y=randint(1,state.size-2);
-    } while(state.map[y][x].t!==TILE.FLOOR);
-    state.map[y][x].t = TILE.CHEST;
-    state.groundItems[keyAt(x,y)] = [generateChestItem()];
-  }
-}
-
-// -----------------------------
-// NPC生成（3階ごとに全員出現）を修正
-function generateNPCFloor(){
-  state.npcs = [];
-  if(state.floor % 3 === 0){
-    const reachable = getReachableTiles(1,1); // スタート地点から行ける床を取得
-    const used = [];
-
-    function getFreeReachableTile(){
-      let pos;
-      do {
-        pos = reachable[randint(0, reachable.length-1)];
-      } while(used.some(p=>p[0]===pos[0] && p[1]===pos[1]));
-      used.push(pos);
-      return pos;
-    }
-
-    for(const npcType of NPC_TYPES){
-      const [nx,ny] = getFreeReachableTile();
-      state.map[ny][nx].t = TILE.NPC;
-      state.npcs.push({x:nx, y:ny, type:npcType.type, name:npcType.name});
-    }
-  }
-}
-
-
-// 到達可能マスを返す関数（BFS）
-function getReachableTiles(sx, sy){
-  const visited = Array.from({length: state.size}, ()=>Array(state.size).fill(false));
-  const reachable = [];
-  const queue = [[sx, sy]];
-  visited[sy][sx] = true;
-  while(queue.length){
-    const [x,y] = queue.shift();
-    if(state.map[y][x].t === TILE.FLOOR) reachable.push([x,y]);
-    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-    for(const [dx,dy] of dirs){
-      const nx=x+dx, ny=y+dy;
-      if(nx>=0 && ny>=0 && nx<state.size && ny<state.size &&
-         !visited[ny][nx] && state.map[ny][nx].t !== TILE.WALL){
-        visited[ny][nx] = true;
-        queue.push([nx,ny]);
-      }
-    }
-  }
-  return reachable;
-}
-
-
-
-// -----------------------------
-// 描画
-const mapEl = document.getElementById('map')
-function renderAll(){
-  const {atk,def,spd}=computeStats()
-
-  document.getElementById('lv').textContent = state.player.lv
-  document.getElementById('exp').textContent = state.player.exp
-  document.getElementById('nextExp').textContent = state.player.nextExp
-
-  document.getElementById('atk').textContent = atk
-  document.getElementById('def').textContent = def
-  document.getElementById('spd').textContent = spd
-
-  // HPと空腹
-  document.getElementById('hp').textContent = state.player.hp
-  document.getElementById('maxhp').textContent = state.player.maxhp
-  document.getElementById('hunger').textContent = state.player.hunger
-  document.getElementById('leftEquip').textContent = state.player.left ? nameOf(state.player.left) : '(なし)'
-  document.getElementById('rightEquip').textContent = state.player.right ? nameOf(state.player.right) : '(なし)'
-  document.getElementById('bagCap').textContent = BAG_CAPACITY;
-
-  // 階数はHTML側に移動済み
-  document.getElementById('floorNum').textContent = state.floor
-
-  mapEl.style.gridTemplateColumns = `repeat(${state.size}, ${getComputedStyle(document.documentElement).getPropertyValue('--cell') || '18px'})`
-  mapEl.innerHTML = ''
-  for(let y=0;y<state.size;y++){
-    for(let x=0;x<state.size;x++){
-      const div=document.createElement('div'); div.className='tile'
-      const tile = state.map[y][x]
-      if(tile.t===TILE.WALL) div.classList.add('wall')
-      else div.classList.add('floor')
-      const itemsHere = groundAt(x,y)
-      if(itemsHere.length) div.classList.add('item')
-      const enemy = enemyAt(x,y)
-
-      if(enemy){ div.classList.remove('floor'); div.classList.add('enemy'); div.textContent='E' }
-      if(tile.t===TILE.CHEST){ div.classList.remove('floor'); div.classList.add('chest'); div.textContent='C' }
-      if(tile.t===TILE.STAIRS){ div.classList.remove('floor'); div.classList.add('stairs'); div.textContent='>' }
-      if(tile.t===TILE.NPC){
-        div.classList.remove('floor'); 
-        div.classList.add('npc'); 
-        const npc = state.npcs.find(n=>n.x===x && n.y===y);
-        if(npc) div.classList.add(npc.type);
-        div.textContent = npc ? (npc.type==='merchant'?'M':
-                                  npc.type==='blacksmith'?'B':
-                                  npc.type==='priest'?'P':
-                                  npc.type==='chef'?'C':'N') : 'N';
-      }
-
-      if(x===state.player.x && y===state.player.y){ div.classList.remove('floor'); div.classList.add('player'); div.textContent='@' }
-      if(itemsHere.length && !(x===state.player.x && y===state.player.y)) div.title = itemsHere.map(i=>nameOf(i)).join(',')
-      mapEl.appendChild(div)
-    }
-  }
-  renderBag()
-  renderLog()
-  checkNPCInteraction()
-}
-
-// -----------------------------
-// NPC操作
-function checkNPCInteraction(){
-  const btn = document.getElementById('npcAction')
-  const px = state.player.x, py = state.player.y
-  const npc = state.npcs.find(n=>Math.abs(n.x-px)+Math.abs(n.y-py)===1)
-  if(npc){
-    btn.disabled=false
-    btn.onclick = ()=> interactWithNPC(npc)
-  } else { btn.disabled=true; btn.onclick=null }
-}
-
-
-//神父と料理人のメニュー
-function interactWithNPC(npc){
-    const npcDiv = document.createElement('div');
-    npcDiv.className = 'npcMenu';
-    npcDiv.style.position = 'absolute';
-    npcDiv.style.top = '50%';
-    npcDiv.style.left = '50%';
-    npcDiv.style.transform = 'translate(-50%,-50%)';
-    npcDiv.style.background = '#222';
-    npcDiv.style.color = '#fff';
-    npcDiv.style.padding = '12px';
-    npcDiv.style.borderRadius = '8px';
-    npcDiv.style.zIndex = 20;
-
-    npcDiv.innerHTML = `<strong>${npc.name}</strong><br>`;
-
-    const closeMenu = () => { document.body.removeChild(npcDiv); renderAll(); };
-
-    if(npc.type==='priest'){
-        const btnHP = document.createElement('button');
-        btnHP.textContent = 'HPを回復する (硬貨10枚で+20)';
-        btnHP.onclick = ()=>{
-            if(spendCoins(10)){
-                state.player.hp = Math.min(state.player.maxhp, state.player.hp+20);
-                log('神父に硬貨10枚を支払い、HP+20回復！');
-            } else log('硬貨が足りない！');
-            closeMenu();
+        // ==== ゲーム設定 ====
+        const GAME_STATE = {
+            TITLE: 0,
+            PLAYING: 1,
+            LEVEL_UP: 2,
+            GAME_OVER: 3
         };
-        npcDiv.appendChild(btnHP);
-    }
+        let gameState = GAME_STATE.TITLE;
 
-    if(npc.type==='chef'){
-        const btnHunger = document.createElement('button');
-        btnHunger.textContent = '空腹を回復する (硬貨10枚で+100)';
-        btnHunger.onclick = ()=>{
-            if(spendCoins(10)){
-                state.player.hunger = Math.min(500, state.player.hunger+100);
-                log('料理人に硬貨10枚を支払い、空腹+100回復！');
-            } else log('硬貨が足りない！');
-            closeMenu();
+        // ==== ゲームオブジェクト ====
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 20,
+            speed: 5,
+            health: 100,
+            maxHealth: 100,
+            xp: 0,
+            level: 1,
+            shotsPerSecond: 2,
         };
-        npcDiv.appendChild(btnHunger);
-    }
 
-    if(npc.type==='merchant') openMerchantUI(npcDiv);
-    if(npc.type==='blacksmith') openBlacksmithUI(npcDiv);
+        let enemies = [];
+        let bullets = [];
+        let xpGems = [];
+        let lastBulletTime = 0;
 
-    // キャンセルボタン
-    const cancel = document.createElement('button');
-    cancel.textContent = '閉じる';
-    cancel.onclick = closeMenu;
-    npcDiv.appendChild(cancel);
+        // ✅ 矢印キー → WASD に変更
+        const keys = { w: false, a: false, s: false, d: false };
 
-    document.body.appendChild(npcDiv);
-}
-
-
-// 商人メニュー
-function openMerchantUI(menuDiv){
-    const items = [
-        {name:'キノコ', type:'mushroom', cost:1},
-        {name:'薬草', type:'herb', cost:1},
-        {name:'剣(+3攻)', type:'sword', atk:3, cost:2},
-        {name:'盾(+3防)', type:'shield', def:3, cost:2},
-        {name:`カバン容量アップ (+5)`, type:'bag', cost: Math.pow(2, bagUpgradeCount)}
-    ];
-
-    items.forEach(item=>{
-        const btn = document.createElement('button');
-        btn.textContent = `${item.name} (-${item.cost}硬貨)`;
-        btn.onclick = ()=>{
-            if(!spendCoins(item.cost)){ log('硬貨が足りない！'); return; }
-            if(item.type==='bag'){ BAG_CAPACITY+=5; bagUpgradeCount++; log(`カバン容量+5を購入！`);}
-            else state.player.bag.push(item);
-            log(`${item.name}を購入！`);
-            renderAll();
-        };
-        menuDiv.appendChild(btn);
-    });
-}
-
-
-
-// 鍛冶職人
-function openBlacksmithUI(menuDiv){
-    // カバン内の剣・盾だけ抽出
-    const equipables = state.player.bag
-        .map((it,i)=>({item:it,index:i}))
-        .filter(e => e.item && (e.item.type==='sword' || e.item.type==='shield'));
-
-    if(equipables.length < 2){
-        const msg = document.createElement('div');
-        msg.textContent = 'カバンに合体できる装備が2つ以上ありません';
-        menuDiv.appendChild(msg);
-        return;
-    }
-
-    const info = document.createElement('div');
-    info.textContent = '合体させたい2つの装備を順にクリックしてください（50硬貨必要）';
-    menuDiv.appendChild(info);
-
-    // 選択状態
-    let firstChoice = null;
-
-    equipables.forEach((e)=>{
-        const btn = document.createElement('button');
-        btn.textContent = nameOf(e.item);
-        btn.onclick = ()=>{
-            if(!firstChoice){
-                firstChoice = e;
-                log(`${nameOf(e.item)} を選択しました。次に合体する装備を選んでください`);
-            } else {
-                // 2つ目を選択した場合
-                const eq1 = firstChoice.item;
-                const eq2 = e.item;
-
-                // 硬貨チェック
-                const cost = 50;
-                if(!spendCoins(cost)){
-                    log('硬貨が足りない！合体できない');
-                    firstChoice = null;
-                    renderAll();
-                    return;
-                }
-
-                let newItem;
-                if(eq1.type===eq2.type && eq1.type==='sword'){
-                    newItem = {type:'sword', atk:eq1.atk + eq2.atk};
-                } else if(eq1.type===eq2.type && eq1.type==='shield'){
-                    newItem = {type:'shield', def:eq1.def + eq2.def};
-                } else {
-                    log('同じ種類の装備同士でしか合体できません');
-                    firstChoice = null;
-                    renderAll();
-                    return;
-                }
-
-                // バッグから削除
-                state.player.bag = state.player.bag.filter(it => it!==eq1 && it!==eq2);
-                state.player.bag.push(newItem);
-
-                log(`${nameOf(eq1)} と ${nameOf(eq2)} を合体！ 新しい装備: ${nameOf(newItem)} (-${cost}硬貨)`);
-                firstChoice = null;
-                renderAll();
-                menuDiv.remove(); // 完了したらUI閉じる
+        // ==== キー入力 ====
+        window.addEventListener('keydown', (e) => {
+            if (gameState === GAME_STATE.TITLE) {
+                startGame();
             }
-        };
-        menuDiv.appendChild(btn);
-    });
+            if (keys.hasOwnProperty(e.key.toLowerCase())) { // 小文字化して比較
+                keys[e.key.toLowerCase()] = true;
+            }
+        });
 
-    // キャンセルボタン
-    const cancel = document.createElement('button');
-    cancel.textContent = '閉じる';
-    cancel.onclick = () => { menuDiv.remove(); renderAll(); };
-    menuDiv.appendChild(cancel);
-}
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.key.toLowerCase())) {
+                keys[e.key.toLowerCase()] = false;
+            }
+        });
 
-
-// -----------------------------
-// 硬貨処理
-function spendCoins(cost){
-  let coins = state.player.bag.find(i => i && i.type==='coins');
-  if(!coins || coins.amount < cost) return false;
-  coins.amount -= cost;
-  if(coins.amount <= 0) state.player.bag = state.player.bag.filter(i=>i!==coins);
-  return true;
-}
-
-function addCoins(amount){
-  let coins = state.player.bag.find(i => i && i.type==='coins');
-  if(coins) coins.amount += amount;
-  else state.player.bag.push({type:'coins', amount});
-}
-
-// -----------------------------
-// 地面アイテム
-function keyAt(x,y){return `${x},${y}`}
-function groundAt(x,y){return state.groundItems[keyAt(x,y)]||[]}
-function addGround(x,y,item){ 
-  const k=keyAt(x,y); state.groundItems[k]=state.groundItems[k]||[]; state.groundItems[k].push(item) 
-}
-
-// -----------------------------
-// 敵関数（簡易）
-function enemyAt(x,y){return state.enemies.find(e=>e.x===x && e.y===y)}
-function computeStats(){ let atk=state.player.atk,def=state.player.def,spd=state.player.spd; return {atk,def,spd} }
-
-// -----------------------------
-// アイテム表示
-function nameOf(it){ 
-  if(!it) return ''; 
-  if(it.type==='mushroom') return 'キノコ'; 
-  if(it.type==='herb') return '薬草'; 
-  if(it.type==='coins') return `硬貨(${it.amount})`; 
-  if(it.type==='sword') return `剣(+${it.atk})`; 
-  if(it.type==='shield') return `盾(+${it.def})`; 
-  return JSON.stringify(it) 
-}
-
-// ---------- カバン描画 ----------
-function renderBag(){
-    const bagEl = document.getElementById('bag');
-    bagEl.innerHTML = '';
-
-    for(let i=0; i<BAG_CAPACITY; i++){
-        const div = document.createElement('div');
-        div.className = 'slot';
-
-        const it = state.player.bag[i];
-        if(it){
-            const n = document.createElement('div');
-            n.className = 'name';
-            n.textContent = nameOf(it);
-            div.appendChild(n);
-
-            div.style.cursor = 'pointer';
-            div.onclick = () => {
-                showItemOptions(i, it);
-            };
-
-        } else {
-            div.textContent = '空';
-            div.style.cursor = 'default';
-            div.onclick = null;
+        // ==== ゲーム制御 ====
+        function startGame() {
+            gameState = GAME_STATE.PLAYING;
+            uiContainer.style.display = 'none';
+            resetGame();
+            lastBulletTime = Date.now();
+            requestAnimationFrame(gameLoop);
         }
-        bagEl.appendChild(div);
-    }
-}
 
-// アイテム操作UIを表示
-function showItemOptions(index, item){
-    // モーダル風の簡易UI
-    const menu = document.createElement('div');
-    menu.style.position = 'absolute';
-    menu.style.top = '20%';
-    menu.style.left = '50%';
-    menu.style.transform = 'translateX(-50%)';
-    menu.style.background = '#222';
-    menu.style.border = '1px solid #555';
-    menu.style.padding = '10px';
-    menu.style.borderRadius = '6px';
-    menu.style.zIndex = 100;
-    
-    const title = document.createElement('div');
-    title.textContent = nameOf(item);
-    title.style.marginBottom = '8px';
-    menu.appendChild(title);
+        function resetGame() {
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            player.health = player.maxHealth;
+            player.xp = 0;
+            player.level = 1;
+            player.shotsPerSecond = 2;
+            enemies = [];
+            bullets = [];
+            xpGems = [];
+        }
 
-    const options = [];
+        function gameOver() {
+            gameState = GAME_STATE.GAME_OVER;
+            uiContainer.style.display = 'block';
+            gameMessage.textContent = `GAME OVER. Score: ${player.xp}. Press any key to restart.`;
+        }
 
-    if(item.type==='mushroom' || item.type==='herb') options.push('使用');
-    if(item.type==='sword' || item.type==='shield') options.push('装備');
-// 装備済みの場合は「外す」ボタンも追加
-if((state.player.left === item) || (state.player.right === item)){
-    options.push('外す');
-}
-    options.push('捨てる');
+        function levelUp() {
+            gameState = GAME_STATE.LEVEL_UP;
+            uiContainer.style.display = 'block';
+            uiContainer.innerHTML = `
+                <h2>Level Up!</h2>
+                <div class="ui-element" onclick="selectUpgrade('firerate')">Increase Fire Rate</div>
+                <div class="ui-element" onclick="selectUpgrade('speed')">Increase Speed</div>
+                <div class="ui-element" onclick="selectUpgrade('health')">Increase Max Health</div>
+            `;
+        }
 
-    options.forEach(opt => {
-        const btn = document.createElement('button');
-        btn.textContent = opt;
-        btn.style.display = 'block';
-        btn.style.margin = '4px 0';
-        btn.onclick = () => {
-            if(opt==='使用') useItem(index);
-
-            else if(opt==='装備') chooseEquipHand(index);
-
-            else if(opt==='捨てる') {
-                addGround(state.player.x,state.player.y,item);
-                state.player.bag.splice(index,1);
-                log(`${nameOf(item)}を地面に捨てた`);
-                renderAll();
+        function selectUpgrade(upgrade) {
+            switch (upgrade) {
+                case 'firerate':
+                    player.shotsPerSecond += 0.5;
+                    break;
+                case 'speed':
+                    player.speed += 1;
+                    break;
+                case 'health':
+                    player.maxHealth += 25;
+                    player.health = player.maxHealth;
+                    break;
             }
-            menu.remove();
-        };
-        menu.appendChild(btn);
-    });
-
-    // 閉じるボタン
-    const close = document.createElement('button');
-    close.textContent = '閉じる';
-    close.style.display = 'block';
-    close.style.margin = '4px 0';
-    close.onclick = () => menu.remove();
-    menu.appendChild(close);
-
-    document.body.appendChild(menu);
-}
-function useItem(index){
-    const item = state.player.bag[index];
-    if(!item) return;
-
-    if(item.type === 'herb'){
-        state.player.hp = Math.min(state.player.maxhp, state.player.hp + 20);
-        log('薬草を使ってHP+20回復！');
-    }
-    else if(item.type === 'mushroom'){
-        state.player.hunger = Math.min(500, state.player.hunger + 50);
-        log('キノコを食べて空腹+50回復！');
-    }
-    else {
-        log('このアイテムは使用できない');
-        return;
-    }
-
-    state.player.bag.splice(index,1); // 使用したアイテムを削除
-    renderAll();
-}
-function equipItem(index, hand){
-    const item = state.player.bag[index];
-    if(!item) return;
-
-    if(item.type !== 'sword' && item.type !== 'shield'){
-        log('装備できません');
-        return;
-    }
-
-    // 選んだ手の装備をバッグに戻す
-    if(state.player[hand]){
-        state.player.bag.push(state.player[hand]);
-        log(`${nameOf(state.player[hand])}を${hand}から外してカバンに戻した`);
-    }
-
-    // 装備する
-    state.player[hand] = item;
-    state.player.bag.splice(index,1);
-    log(`${nameOf(item)}を${hand}に装備した`);
-
-    renderAll();
-}
-
-
-// 装備手選択
-function chooseEquipHand(index){
-    const item = state.player.bag[index];
-    if(!item) return;
-
-    const menu = document.createElement('div');
-    menu.style.position = 'absolute';
-    menu.style.top = '20%';
-    menu.style.left = '50%';
-    menu.style.transform = 'translateX(-50%)';
-    menu.style.background = '#222';
-    menu.style.border = '1px solid #555';
-    menu.style.padding = '10px';
-    menu.style.borderRadius = '6px';
-    menu.style.zIndex = 100;
-
-    const title = document.createElement('div');
-    title.textContent = `${nameOf(item)}を装備する手を選んでください`;
-    title.style.marginBottom = '8px';
-    menu.appendChild(title);
-
-    ['左手','右手'].forEach((hand, i)=>{
-        const btn = document.createElement('button');
-        btn.textContent = hand;
-        btn.style.display = 'block';
-        btn.style.margin = '4px 0';
-        btn.onclick = () => {
-            equipItem(index, i===0?'left':'right');
-            menu.remove();
-        };
-        menu.appendChild(btn);
-    });
-
-    const close = document.createElement('button');
-    close.textContent = '閉じる';
-    close.style.display = 'block';
-    close.style.margin = '4px 0';
-    close.onclick = () => menu.remove();
-    menu.appendChild(close);
-
-    document.body.appendChild(menu);
-}
-
-
-// 装備ステータス反映
-function computeStats(){
-  let atk=state.player.atk;
-  let def=state.player.def;
-  let spd=state.player.spd;
-
-  if(state.player.left){
-    if(state.player.left.type==='sword') atk += state.player.left.atk;
-    if(state.player.left.type==='shield') def += state.player.left.def;
-  }
-  if(state.player.right){
-    if(state.player.right.type==='sword') atk += state.player.right.atk;
-    if(state.player.right.type==='shield') def += state.player.right.def;
-  }
-
-  return {atk,def,spd};
-}
-
-
-
-
-// -----------------------------
-// ログ
-function log(s){ state.log.push(s); renderLog() }
-function renderLog(){ const l=document.getElementById('log'); l.innerHTML = state.log.slice(-200).map(s=>`<div>${s}</div>`).join(''); l.scrollTop=l.scrollHeight }
-
-// -----------------------------
-// プレイヤー移動
-function playerAct(nx,ny){
-  if(nx<0||ny<0||nx>=state.size||ny>=state.size) return;
-
-  // 行動ごとに空腹度を消費
-  state.player.hunger = Math.max(0, state.player.hunger - 1);
-  if(state.player.hunger <= 0){ 
-    gameOver('空腹で力尽きた...'); 
-    return; 
-  }
-
-  // 壁チェック
-  if(state.map[ny][nx].t === TILE.WALL){
-    log('壁にぶつかった...');
-    enemiesAct();  // ★ ここで敵の行動も発生
-    renderAll();
-    return;
-  }
-
-  // 敵チェック
-  const enemy = enemyAt(nx,ny);
-  if(enemy){
-    attackEnemy(enemy);
-    enemiesAct();   // 攻撃後も敵ターン
-    renderAll();
-    return; // 攻撃した場合は移動しない
-  }
-
-  // 移動
-  state.player.x = nx; 
-  state.player.y = ny;
-
-  // 足元アイテム取得
-  const key = keyAt(state.player.x,state.player.y);
-  if(state.groundItems[key]){
-  const items = state.groundItems[key];
-  let picked = [];
-
-  items.forEach(item => {
-    if(item.type === 'coins'){ 
-      addCoins(item.amount);
-      log(`宝箱から${nameOf(item)}を手に入れた！`);
-      picked.push(item);
-    } else if(state.player.bag.length < BAG_CAPACITY){
-      state.player.bag.push(item);
-      log(`宝箱から${nameOf(item)}を手に入れた！`);
-      picked.push(item);
-    } else {
-      log(`カバンがいっぱいで ${nameOf(item)} は拾えなかった…`);
-      // 拾えなかったアイテムは地面に残る
-    }
-  });
-
-  // 拾ったものを削除し、残りはそのまま地面に置いておく
-  state.groundItems[key] = items.filter(i => !picked.includes(i));
-
-  if(state.groundItems[key].length === 0){
-    delete state.groundItems[key];
-    if(state.map[state.player.y][state.player.x].t===TILE.CHEST)
-      state.map[state.player.y][state.player.x].t=TILE.FLOOR;
-  }
-}
-
-
-  // 敵ターン移動
-  enemiesAct();
-
-  renderAll();
-}
-
-
-// 敵の行動
-function enemiesAct(){
-  for(const e of state.enemies){
-    // もしプレイヤーが隣接していたら攻撃
-// ...（enemiesAct のループ内でプレイヤーが隣接していたら攻撃する箇所）
-if(manhattan(e.x, e.y, state.player.x, state.player.y) === 1){
-  const stats = computeStats();
-  // 最低ダメージを0に変更
-  const edmg = Math.max(0, e.atk - stats.def);
-  if(edmg > 0){
-    state.player.hp -= edmg;
-    log(`敵が攻撃！${edmg}ダメージを受けた！`);
-  } else {
-    log('敵の攻撃を防いだ！');
-  }
-  if(state.player.hp <= 0){
-    gameOver('敵に倒された...');
-    return; // 即終了
-  }
-  continue; // 攻撃したら移動はしない
-}
-
-
-// プレイヤーが近い場合は追跡
-if(manhattan(e.x,e.y,state.player.x,state.player.y) <= 5){
-  let dx = 0, dy = 0;
-  // 縦横の差を比べて大きい方を優先
-  if(Math.abs(state.player.x - e.x) > Math.abs(state.player.y - e.y)){
-    dx = Math.sign(state.player.x - e.x);
-  } else {
-    dy = Math.sign(state.player.y - e.y);
-  }
-  const nx = e.x + dx, ny = e.y + dy;
-  if(state.map[ny][nx].t===TILE.FLOOR && !enemyAt(nx,ny) && !(nx===state.player.x && ny===state.player.y)){
-    e.x = nx; e.y = ny;
-  }
-}
-
-else {
-      // ランダム移動
-      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-      const [dx,dy] = dirs[randint(0,3)];
-      const nx = e.x+dx, ny = e.y+dy;
-      if(nx>=0 && ny>=0 && nx<state.size && ny<state.size && state.map[ny][nx].t===TILE.FLOOR && !enemyAt(nx,ny)){
-        e.x = nx; e.y = ny;
-      }
-    }
-  }
-}
-
-
-//足踏み
-function playerWait() {
-  // 移動せずにターン消費
-  state.player.hunger = Math.max(0, state.player.hunger - 1);
-  log('その場で足踏みした'); // ログに出す
-  if(state.player.hunger <= 0){ 
-    gameOver('空腹で力尽きた...'); 
-    return; 
-  }
-
-  // 敵ターンも進む
-  enemiesAct();
-  renderAll();
-}
-
-// ボタンにイベント設定
-document.getElementById('wait').onclick = playerWait;
-
-
-
-// -----------------------------
-// 階段
-function tryDescend(){
-  const [sx,sy] = state.mapData.stairs
-  if(manhattan(sx,sy,state.player.x,state.player.y)<=1){
- state.floor+=1;
- startNewFloor(); 
-saveGame();
-log('自動セーブ')
-}
-  else { log('階段から遠い') }
-}
-document.getElementById('descend').onclick=()=> tryDescend()
-
-
-
-//タイトルに戻るボタン内容
-document.getElementById('returnTitleBtn').onclick = () => {
-    if(confirm('タイトル画面に戻ります。よろしいですか？')){
-        // ゲームUIを隠してタイトル画面表示
-        document.getElementById('gameUI').style.display = 'none';
-        document.getElementById('titleScreen').style.display = 'block';
-        log('タイトル画面に戻りました');
-    }
-};
-
-
-
-// -----------------------------
-// ゲームオーバー
-function gameOver(reason){  
-state.player=defaultPlayer(); 
-state.floor=1; 
-startNewFloor(); 
-clearLog();
-saveGame();
-log('--- GAME OVER --- '+reason)
-
-}
-
-
-//ログを初期化
-function clearLog() {
-    state.log = [];
-    renderLog();
-}
-
-
-// -----------------------------
-// キー操作
-window.addEventListener('keydown',(e)=>{
-  const key=e.key; 
-  let dx=0,dy=0;
-
-  //足踏み
-  if(e.key === ' '){ // スペース
-    e.preventDefault();
-    playerWait();
-  }
-
-
-  // 上下左右
-  if(['ArrowUp','w','W'].includes(key)) dy=-1;
-  if(['ArrowDown','s','S'].includes(key)) dy=1;
-  if(['ArrowLeft','a','A'].includes(key)) dx=-1;
-  if(['ArrowRight','d','D'].includes(key)) dx=1;
-
-  // 斜め移動（プレイヤー専用）
-  if(key==='q' || key==='Q'){ dx=-1; dy=-1; } // ↖
-  if(key==='e' || key==='E'){ dx=1; dy=-1; }  // ↗
-  if(key==='z' || key==='Z'){ dx=-1; dy=1; }  // ↙
-  if(key==='c' || key==='C'){ dx=1; dy=1; }   // ↘
-
-  if(dx!==0||dy!==0){ 
-    e.preventDefault(); 
-
-
-// ★ 斜め移動の角抜け禁止チェック
-if(dx!==0 && dy!==0){
-  const px = state.player.x, py = state.player.y;
-  const tile1 = state.map[py][px+dx]; // 横
-  const tile2 = state.map[py+dy][px]; // 縦
-  if(tile1.t===TILE.WALL && tile2.t===TILE.WALL){
-    log('角抜けはできない！');
-    return; // 移動キャンセル
-  }
-}
-
-playerAct(state.player.x+dx, state.player.y+dy);
-}
-});
-
-
-
-
-// -----------------------------
-// フロア生成
-function startNewFloor(){
-  state.groundItems = {};
-  state.enemies = []; // ← ここで敵リストをクリア
-  generateMap();
-  
-  // NPCフロアなら敵・宝箱を生成しない
-  if(state.floor % 3 !== 0){
-    generateEnemies();
-    generateChests();
-  }
-  
-  generateNPCFloor();
-  state.player.x = 1;
-  state.player.y = 1;
-  renderAll();
-}
-
-//自動ロード
-function autoLoad(){
-  const saved = localStorage.getItem('miniRogueSave');
-  if(!saved) return false;
-
-  const saveData = JSON.parse(saved);
-  Object.assign(state, saveData.state);
-  BAG_CAPACITY = saveData.BAG_CAPACITY;
-  bagUpgradeCount = saveData.bagUpgradeCount;
-  renderAll();
-  log('セーブデータを自動ロードしました！');
-  return true;
-}
-
-
-//自動セーブ
-function saveGame(){
-  const saveData = {
-    state: state,
-    BAG_CAPACITY: BAG_CAPACITY,
-    bagUpgradeCount: bagUpgradeCount
-  };
-  localStorage.setItem('miniRogueSave', JSON.stringify(saveData));
-  // 任意: ログに表示はしなくてもOK
-}
-
-// -----------------------------
-// 初回開始
-if(!autoLoad()){ startNewFloor(); }
-</script>
+            gameState = GAME_STATE.PLAYING;
+            uiContainer.style.display = 'none';
+            lastBulletTime = Date.now();
+        }
+
+        // ==== ゲームループ ====
+        function gameLoop(timestamp) {
+            if (gameState === GAME_STATE.PLAYING) {
+                update();
+                draw();
+            } else if (gameState === GAME_STATE.GAME_OVER) {
+                draw();
+            } else if (gameState === GAME_STATE.LEVEL_UP) {
+                draw();
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ==== 更新処理 ====
+        function update() {
+            // プレイヤーの移動 (WASD)
+            if (keys.w) player.y -= player.speed;
+            if (keys.s) player.y += player.speed;
+            if (keys.a) player.x -= player.speed;
+            if (keys.d) player.x += player.speed;
+
+            // 画面外に出ないように
+            player.x = Math.max(0, Math.min(canvas.width, player.x));
+            player.y = Math.max(0, Math.min(canvas.height, player.y));
+
+            // 自動攻撃
+            const now = Date.now();
+            if (now - lastBulletTime > 1000 / player.shotsPerSecond) {
+                if (enemies.length > 0) {
+                    const targetEnemy = enemies[0];
+                    const angle = Math.atan2(targetEnemy.y - player.y, targetEnemy.x - player.x);
+                    bullets.push({
+                        x: player.x,
+                        y: player.y,
+                        angle: angle,
+                        speed: 7
+                    });
+                }
+                lastBulletTime = now;
+            }
+
+            // 敵の生成
+            if (Math.random() < 0.1) {
+                const side = Math.floor(Math.random() * 4);
+                let x, y;
+                if (side === 0) { x = Math.random() * canvas.width; y = -20; }
+                if (side === 1) { x = Math.random() * canvas.width; y = canvas.height + 20; }
+                if (side === 2) { x = -20; y = Math.random() * canvas.height; }
+                if (side === 3) { x = canvas.width + 20; y = Math.random() * canvas.height; }
+                enemies.push({ x: x, y: y, size: 15, speed: 2, health: 10 });
+            }
+
+            // 敵の移動とプレイヤーとの衝突判定
+            enemies.forEach(enemy => {
+                const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+                enemy.x += Math.cos(angle) * enemy.speed;
+                enemy.y += Math.sin(angle) * enemy.speed;
+
+                const dist = Math.sqrt((enemy.x - player.x) ** 2 + (enemy.y - player.y) ** 2);
+                if (dist < enemy.size + player.size) {
+                    player.health -= 1;
+                    if (player.health <= 0) {
+                        gameOver();
+                    }
+                }
+            });
+
+            // 弾丸の移動と敵との衝突
+            bullets.forEach(bullet => {
+                bullet.x += Math.cos(bullet.angle) * bullet.speed;
+                bullet.y += Math.sin(bullet.angle) * bullet.speed;
+            });
+            bullets = bullets.filter(b => b.x > -10 && b.x < canvas.width + 10 && b.y > -10 && b.y < canvas.height + 10);
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    const enemy = enemies[i];
+                    const bullet = bullets[j];
+                    const dist = Math.sqrt((enemy.x - bullet.x) ** 2 + (enemy.y - bullet.y) ** 2);
+                    if (dist < enemy.size) {
+                        enemy.health -= 10;
+                        bullets.splice(j, 1);
+                        if (enemy.health <= 0) {
+                            xpGems.push({ x: enemy.x, y: enemy.y, size: 5 });
+                            enemies.splice(i, 1);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // 経験値ジェムの取得
+            xpGems.forEach((gem, i) => {
+                const dist = Math.sqrt((gem.x - player.x) ** 2 + (gem.y - player.y) ** 2);
+                if (dist < gem.size + player.size) {
+                    player.xp += 10;
+                    xpGems.splice(i, 1);
+                    if (player.xp >= player.level * 100) {
+                        player.level++;
+                        levelUp();
+                    }
+                }
+            });
+        }
+
+        // ==== 描画処理 ====
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // プレイヤー
+            ctx.fillStyle = '#00aaff';
+            ctx.fillRect(player.x - player.size / 2, player.y - player.size / 2, player.size, player.size);
+
+            // 敵
+            ctx.fillStyle = '#ff0055';
+            enemies.forEach(enemy => {
+                ctx.fillRect(enemy.x - enemy.size / 2, enemy.y - enemy.size / 2, enemy.size, enemy.size);
+            });
+
+            // 弾丸
+            ctx.fillStyle = '#00ffaa';
+            bullets.forEach(bullet => {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 経験値ジェム
+            ctx.fillStyle = '#ffaa00';
+            xpGems.forEach(gem => {
+                ctx.beginPath();
+                ctx.arc(gem.x, gem.y, gem.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // UI
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px "Courier New"';
+            ctx.fillText(`Health: ${player.health}/${player.maxHealth}`, 10, 20);
+            ctx.fillText(`Level: ${player.level}`, 10, 40);
+            ctx.fillText(`XP: ${player.xp}`, 10, 60);
+        }
+    </script>
 </body>
 </html>
-
-<script>
-// タイトル画面のボタン処理
-document.getElementById('startBtn').onclick = () => {
-    if(!autoLoad()){
-        log('新規ゲームを開始します');
-        startNewFloor(); // セーブがなければ新規開始
-    }
-    startGameUI();
-};
-
-document.getElementById('resetBtn').onclick = () => {
-    if(confirm('本当に初期化しますか？')){
-        localStorage.removeItem('miniRogueSave');
-        alert('セーブデータを削除しました');
-        location.reload(); // ページをリロードして新規スタート
-    }
-};
-
-document.getElementById('supportBtn').onclick = () => {
-    alert('サポートセンター\n不具合や質問はこちらまで: support@example.com');
-};
-
-// ゲーム開始UI表示
-function startGameUI(){
-    document.getElementById('titleScreen').style.display = 'none';
-    document.getElementById('gameUI').style.display = 'block';
-    renderAll();
-}
-</script>
-
-</div>
-
-<script>
-function startGameUI(){
-    document.getElementById('titleScreen').style.display = 'none';
-    document.getElementById('gameUI').style.display = 'flex'; // display:blockでもOK
-    renderAll();
-}
-
-// タイトルに戻るボタン（確認なしで即戻る）
-document.getElementById('returnTitleBtn').onclick = () => {
-    document.getElementById('gameUI').style.display = 'none';
-    document.getElementById('titleScreen').style.display = 'flex';
-    renderAll(); 
-    log('タイトル画面に戻りました');
-};
-
-</script>
